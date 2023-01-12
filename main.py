@@ -1,12 +1,13 @@
 # testing internet connection
 # looking for different SSID thru a hidden file
 from micropython import const
-from machine import Pin, Timer, I2C
+from machine import Pin, ADC
 import time
 import network
 from ssids import SSIDs
-from ssd1306_helper import Display
+from display import Display
 from dht import DHT11
+from state import State
 
 onboard_led = Pin("LED", Pin.OUT)
 
@@ -14,6 +15,7 @@ def connect_to_WIFI():
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
     for SSID, PASSWORD in SSIDs:
+        print("SSID ", SSID)
         wlan.connect(SSID, PASSWORD)
         # Wait for connect or fail
         max_wait = 10
@@ -50,8 +52,13 @@ NB_BUTTONS = const(4)
 buttons = [Pin(i, Pin.IN, Pin.PULL_DOWN) for i in range(NB_BUTTONS)]
 lastValues = [-1] * NB_BUTTONS
 
-currentState = 99   # to display HOME screen
-lastState = -1
+# the 4 ACDs
+NB_ACDS = const(3)
+acds = [ADC(Pin(26)), ADC(Pin(27)), ADC(Pin(28))]
+min_moisture=const(0)
+max_moisture=const(65535)
+
+state = State(99)   # to display HOME screen and get back to it after 5 seconds
 
 def allReleased():
     """
@@ -67,45 +74,52 @@ while True:
             lastValues[i] = button.value()
             print(f"B{i} = {lastValues[i]}")
     
-    if lastState != currentState:
-        print("state change:", lastState, "-->", currentState)
-        lastState = currentState
-    
-    if currentState == 0:
+#     if state.lastState != state.currentState:
+#         print(state)
+
+    if state.currentState == 0:
         # default waiting state to wait for button to be pressed
         if lastValues[0]:
             firstTime = True
-            lastState, currentState = 0, 1
+            state.changeTo(1)
         elif lastValues[1]:
             firstTime = True
-            lastState, currentState = 0, 2
+            state.changeTo(2)
         elif lastValues[2]:
             firstTime = True
-            lastState, currentState = 0, 3
+            state.changeTo(3)
         elif lastValues[3]:
             firstTime = True
-            lastState, currentState = 0, 4
+            state.changeTo(4)
             
         # wait for button to be released
         allReleased()
     
-    elif currentState == 1:
+    elif state.currentState == 1:
         if firstTime:
             dis.multiLines("Press any button")
             firstTime = False
         if sum(lastValues) > 0:
             # a button is pressed: let's go back to main screen
-            lastState, currentState = 1, 99        
+            state.changeToDefault()
     
-    elif currentState == 2:
+    elif state.currentState == 2:
         if firstTime:
-            dis.screen("Press HOME", button4="HOME")
+            raw_value = acds[0].read_u16()
+            moisture = (max_moisture - raw_value) * 100 // (max_moisture - min_moisture)
+            dis.screen(f"""{moisture}% moisture
+{raw_value}
+
+Press HOME""",
+                       button3="Read", button4="HOME")
             firstTime = False
         if lastValues[3]:
             # button4: let's go back to main screen
-            lastState, currentState = 2, 99  
+            state.changeToDefault()
+        elif lastValues[2]:
+            firstTime = True
     
-    elif currentState == 3:
+    elif state.currentState == 3:
         if firstTime:
             dis.screen("Press STOP", button3="STOP")
             buzzer.on()
@@ -113,9 +127,9 @@ while True:
         if lastValues[2]:
             # button3: let's go back to main screen
             buzzer.off()
-            lastState, currentState = 3, 99 
+            state.changeToDefault()
    
-    elif currentState == 4:
+    elif state.currentState == 4:
         if firstTime:
             now = localtime()
             sensor.measure()
@@ -127,15 +141,15 @@ Humidity: {humidity}%""", button4="Home")
             firstTime = False
         if lastValues[3]:
             # button4: let's go back to main screen
-            lastState, currentState = 2, 99  
+            state.changeToDefault()
    
-    elif currentState == 99:
+    elif state.currentState == 99:
         # display the HOME screen and go to waiting a press (state = 0)
         dis.screen(f"""{now[0]}-{now[1]:02}-{now[2]:02}
 {now[3]}:{now[4]:02}:{now[5]:02}
 Connected to
 {wlan.config("ssid")}""",
 button1="1", button2="2",button3="3", button4="4")
-        lastState, currentState = 99, 0
+        state.changeTo(0)
         allReleased()
         
