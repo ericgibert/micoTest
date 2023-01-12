@@ -107,10 +107,7 @@ while True:
         if firstTime:
             raw_value = acds[0].read_u16()
             moisture = (max_moisture - raw_value) * 100 // (max_moisture - min_moisture)
-            dis.screen(f"""{moisture}% moisture
-{raw_value}
-
-Press HOME""",
+            dis.screen(f"""{moisture}% moisture\n{raw_value}""",
                        button3="Read", button4="HOME")
             firstTime = False
         if lastValues[3]:
