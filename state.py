@@ -14,6 +14,7 @@ class State:
         self.lastState, self.currentState = -1, initialState
         self.delay = delay
         self.defaultState = defaultSate or initialState
+        self.firstTime = False  # change to True when changing state
 
     def changeToDefault(self, t=None):
         """
@@ -31,6 +32,7 @@ class State:
         """
         self.lastState = self.currentState
         self.currentState = newState
+        self.firstTime = True  # change to True when changing state for first time entry action
         if self.delay and self.currentState != self.defaultState:
             Timer(period=self.delay * 1000, mode=Timer.ONE_SHOT, callback=self.changeToDefault)
 
