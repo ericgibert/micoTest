@@ -90,7 +90,7 @@ while True:
     # Action for button 1
     elif state.currentState == 1:
         if state.firstTime:
-            dis.multiLines("Press any button")
+            wlan = connect_to_WIFI()
             state.firstTime = False
         if sum(lastValues) > 0:
             # a button is pressed: let's go back to main screen
