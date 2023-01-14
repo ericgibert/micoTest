@@ -27,7 +27,7 @@ def setClock(tz=0):
         s.settimeout(1)
         res = s.sendto(NTP_QUERY, addr)
         msg = s.recv(48)
-    except socket.timeout:
+    except:
         print("No response received from %s." % NTP_HOST)
     finally:
         s.close()

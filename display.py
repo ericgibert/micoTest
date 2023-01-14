@@ -35,7 +35,9 @@ class Display(SSD1306_I2C):
         self.show()
 
 
-    def screen(self, mLines, title="", footer="", button1="", button2="", button3="", button4=""):
+    def screen(self, mLines, title="", footer="",
+               button1="", button2="", button3="", button4="",
+               leftMargin=1, topMargin=2):
         """
             Display the following text:
             
@@ -55,10 +57,10 @@ class Display(SSD1306_I2C):
         f, b3, b4 = f"{footer.strip():^{charByLine}}", button3.strip(), button4.strip()
         footerLine = b3 + f[len(b3):-len(b4)] + b4
         mLines += "\n\n\n\n"
-        mLines = '\n'.join([ l[:charByLine].strip() for l in (mLines.split('\n'))[:4] ])
+        mLines = '\n'.join([ l[:charByLine] for l in (mLines.split('\n'))[:4] ])
         self.multiLines(f"""{titleLine}
 {mLines}
-{footerLine}""", leftMargin=1, topMargin=2)
+{footerLine}""", leftMargin=leftMargin, topMargin=topMargin)
 
     def test(self):
         """

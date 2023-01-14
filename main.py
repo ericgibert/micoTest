@@ -140,10 +140,10 @@ Humidity: {humidity}%""", button4="Home")
     elif state.currentState == 99:
         # display the HOME screen and go to waiting a press (state = 0)
         now = localtime()
-        dis.screen(f"""{now[0]}-{now[1]:02}-{now[2]:02} {DAYS[now[6]]}
-{now[3]}:{now[4]:02}:{now[5]:02}
-Connected to
-{wlan.config("ssid")}""",
-                   button1="1", button2="2", button3="3", button4="4")
+        dis.screen(f""" {now[0]}-{now[1]:02}-{now[2]:02} {DAYS[now[6]]}
+ {now[3]}:{now[4]:02}:{now[5]:02}
+ Connected to
+ {wlan.config("ssid")}""",
+                   button1="Wifi", button2="ADC0", button3="Buzz", button4="DHT")
         state.changeTo(0)
         allReleased()
