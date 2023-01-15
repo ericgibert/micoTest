@@ -86,7 +86,7 @@ while True:
         elif lastValues[3]:
             state.changeTo(4)
         else:
-            if refresh == 10:
+            if refresh >= 5:
                 state.changeTo(99)
                 refresh = 0
             else:
