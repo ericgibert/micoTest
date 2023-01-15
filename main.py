@@ -106,9 +106,13 @@ while True:
     # Action for button 2
     elif state.currentState == 2:
         if state.firstTime:
-            raw_value = acds[0].read_u16()
-            moisture = (max_moisture - raw_value) * 100 // (max_moisture - min_moisture)
-            dis.screen(f"""{moisture}% moisture\n{raw_value}""",
+            mLines = ""
+            for i, acd in enumerate(acds):
+                raw_value = acd.read_u16()
+                moisture = (max_moisture - raw_value) * 100 // (max_moisture - min_moisture)
+                mLines += f"""{i}: {moisture}% [{raw_value}]\n"""
+            dis.screen(mLines,
+                       title="Moisture",
                        button3="Read", button4="HOME")
             state.firstTime = False
         if lastValues[3]:
@@ -150,7 +154,7 @@ Humidity: {humidity}%""", button4="Home")
         dis.screen(f""" {now[0]}-{now[1]:02}-{now[2]:02} {DAYS[now[6]]}
  {now[3]}:{now[4]:02}:{now[5]:02}
  Connected to
- {wlan.config("ssid")}""",
-                   button1="Wifi", button2="ADC0", button3="Buzz", button4="DHT")
+ {wlan.config("ssid") or "None"}""",
+                   button1="Wifi", button2="ACD", button3="Buzz", button4="DHT")
         state.changeTo(0)
         allReleased()

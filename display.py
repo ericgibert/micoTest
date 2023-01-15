@@ -11,7 +11,7 @@ from ssd1306 import SSD1306_I2C
 
 WIDTH=const(128)
 HEIGHT=const(64)
-FONTSIZE=const((8,10))  #  code to improve when we can change the font size (8px by 10px)
+FONTSIZE=const((8, 10))  #  code to improve when we can change the font size (8px by 10px)
 
 class Display(SSD1306_I2C):
     def __init__(self, port, scl, sda, width=WIDTH, height=HEIGHT, freq=400000):
@@ -51,9 +51,9 @@ class Display(SSD1306_I2C):
         charByLine = WIDTH // self.fontSize[0]  #  font 10 -->  8px by 10px
         nbLines = HEIGHT // self.fontSize[1] - 2  # because 1st line is for Title and last line for Footer
         t, b1, b2 = f"{title.strip():^{charByLine}}", button1.strip(), button2.strip()
-        titleLine = b1 + t[len(b1):-len(b2)] + b2
+        titleLine = b1 + t[len(b1):charByLine-len(b2)] + b2
         f, b3, b4 = f"{footer.strip():^{charByLine}}", button3.strip(), button4.strip()
-        footerLine = b3 + f[len(b3):-len(b4)] + b4
+        footerLine = b3 + f[len(b3):charByLine-len(b4)] + b4
         mLines += '\n' * nbLines
         mLines = '\n'.join([ l[:charByLine] for l in (mLines.split('\n'))[:nbLines] ])
         self.multiLines(f"""{titleLine}
@@ -74,7 +74,7 @@ class Display(SSD1306_I2C):
 # if __name__ == "__main__":
 #     from time import sleep, localtime
 #     dis = Display(0, 17, 16)
-#     dis.screen("\nline 1 qui est tres longue\net ligne 2\nplus courte",
+#     dis.screen("line 1 qui est tres longue\net ligne 2\nplus courte",
 #                title="Title", footer="Footer",
 #                button1="1", button2="2",button3="3", button4="4")
 #     while True:
