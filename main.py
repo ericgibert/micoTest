@@ -12,19 +12,19 @@ from state import State
 
 # pins and hardware definitions
 onboard_led = Pin("LED", Pin.OUT)
-dis = Display(0, 17, 16)
+dis = Display(0, 17, 16) # ic2 port and pins
 # the 4 buttons around the screen
 NB_BUTTONS = const(4)
 buttons = [Pin(i, Pin.IN, Pin.PULL_DOWN) for i in range(NB_BUTTONS)]
 lastValues = [-1] * NB_BUTTONS
-# the 4 ACDs
+# the 3 ACDs
 NB_ACDS = const(3)
-acds = [ADC(Pin(26)), ADC(Pin(27)), ADC(Pin(28))]
+acds = [ADC(Pin(26)), ADC(Pin(27)), ADC(Pin(28))]  # pico's ACD pins
 min_moisture = const(0)
 max_moisture = const(65535)
 # buzzer and DHT11
-sensor = DHT11(Pin(15))
 buzzer = Pin(12, Pin.OUT)
+sensor = DHT11(Pin(15))
 
 DAYS=const( ('MON', "TUE", "WED", "THU", "FRI", 'SAT', "SUN") )
 
@@ -40,13 +40,13 @@ def connect_to_WIFI():
         while max_wait > 0:
             dis.multiLines(f"Connecting to\n{SSID}\n\n{11 - max_wait}/10")
             if wlan.status() < 0 or wlan.status() >= 3:
+                sleep(1)
                 break
             max_wait -= 1
             print('waiting for connection...')
             sleep(1)
         if wlan.isconnected(): return wlan
     return None
-
 
 
 wlan = connect_to_WIFI()
@@ -60,13 +60,14 @@ print("time:", now)
 
 def allReleased():
     """
-        Wait that all the buttons are released - prevents bounce effect
+        Wait for all the buttons to be released - prevents bounce effect
     """
     while sum([b.value() for b in buttons]):
         sleep(0.05)
 
 
 state = State(99)  # to display HOME screen and get back to it after 5 seconds
+refresh = 0
 while True:
     sleep(0.1)
     for i, button in enumerate(buttons):
@@ -84,6 +85,12 @@ while True:
             state.changeTo(3)
         elif lastValues[3]:
             state.changeTo(4)
+        else:
+            if refresh == 10:
+                state.changeTo(99)
+                refresh = 0
+            else:
+                refresh += 1
         # wait for button to be released
         allReleased()
 

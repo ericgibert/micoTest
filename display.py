@@ -1,9 +1,9 @@
 """
-  Small python module to help manging the ssd1306 OLED display
+  Small python module to help managing the ssd1306 OLED display
   - multiLines: display a multi-lines text separated by \n
-  - screen: display a full screen with 4 buttons, title, footer and text
+  - screen: display a full screen with 4 buttons, title, footer and multi-lines text
   - test: display text for testing the display capacity
-  
+
 """
 from micropython import const
 from machine import Pin, I2C
@@ -11,7 +11,7 @@ from ssd1306 import SSD1306_I2C
 
 WIDTH=const(128)
 HEIGHT=const(64)
-FONTSIZE=const(10)  #  code to improve when we can change the font size (8px by 10px)
+FONTSIZE=const((8,10))  #  code to improve when we can change the font size (8px by 10px)
 
 class Display(SSD1306_I2C):
     def __init__(self, port, scl, sda, width=WIDTH, height=HEIGHT, freq=400000):
@@ -31,7 +31,7 @@ class Display(SSD1306_I2C):
         x, y = leftMargin, topMargin
         for line in lines.split('\n'):
             self.text(line, x, y)
-            y += self.fontSize
+            y += self.fontSize[1]
         self.show()
 
 
@@ -47,20 +47,19 @@ class Display(SSD1306_I2C):
             mLine 3.......
             mLine 4.......
             3    Footer  4
-        
-        This code is currently written 
         """
-        charByLine = WIDTH // 8  #  font 10 -->  8px by 10px
-        nbLines = HEIGHT // self.fontSize - 2  # becasue 1st line is for Title and last line for Footer
+        charByLine = WIDTH // self.fontSize[0]  #  font 10 -->  8px by 10px
+        nbLines = HEIGHT // self.fontSize[1] - 2  # because 1st line is for Title and last line for Footer
         t, b1, b2 = f"{title.strip():^{charByLine}}", button1.strip(), button2.strip()
         titleLine = b1 + t[len(b1):-len(b2)] + b2
         f, b3, b4 = f"{footer.strip():^{charByLine}}", button3.strip(), button4.strip()
         footerLine = b3 + f[len(b3):-len(b4)] + b4
-        mLines += "\n\n\n\n"
-        mLines = '\n'.join([ l[:charByLine] for l in (mLines.split('\n'))[:4] ])
+        mLines += '\n' * nbLines
+        mLines = '\n'.join([ l[:charByLine] for l in (mLines.split('\n'))[:nbLines] ])
         self.multiLines(f"""{titleLine}
 {mLines}
-{footerLine}""", leftMargin=leftMargin, topMargin=topMargin)
+{footerLine}""",
+                        leftMargin=leftMargin, topMargin=topMargin)
 
     def test(self):
         """
