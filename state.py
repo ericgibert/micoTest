@@ -21,12 +21,11 @@ class State:
         Callback function to force the current state to the default state
         :return:
         """
-        self.lastState = self.currentState
-        self.currentState = self.defaultState
+        self.changeTo(self.defaultState)
 
     def changeTo(self, newState):
         """
-        Change t\the currentState to a new given state, saving current in last State
+        Change the currentState to a new given state, saving current in last State
         :param newState:
         :return:
         """
@@ -35,6 +34,7 @@ class State:
         self.firstTime = True  # change to True when changing state for first time entry action
         if self.delay and self.currentState != self.defaultState:
             Timer(period=self.delay * 1000, mode=Timer.ONE_SHOT, callback=self.changeToDefault)
+        print("State changes from", self.lastState, "to", self.currentState)
 
     def __str__(self):
         return(f"currentState:{self.currentState} /  lastState={self.lastState}")

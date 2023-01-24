@@ -16,7 +16,7 @@ dis = Display(0, 17, 16) # ic2 port and pins
 # the 4 buttons around the screen
 NB_BUTTONS = const(4)
 buttons = [Pin(i, Pin.IN, Pin.PULL_DOWN) for i in range(NB_BUTTONS)]
-lastValues = [-1] * NB_BUTTONS
+lastValues = [0] * NB_BUTTONS
 # the 3 ACDs
 NB_ACDS = const(3)
 acds = [ADC(Pin(26)), ADC(Pin(27)), ADC(Pin(28))]  # pico's ACD pins
@@ -66,41 +66,37 @@ def allReleased():
         sleep(0.05)
 
 
-state = State(99)  # to display HOME screen and get back to it after 5 seconds
+def button_pressed(pin):
+    """
+    Callback function when a button is pressed -->  change state accordingly
+    """
+    pinNum = buttons.index(pin)
+    lastValues[pinNum] = pin()
+    print(f"pin({pinNum}) = {pin()}")
+    if lastValues[pinNum]:  # pressed
+        if state.currentState == 0:
+            state.changeTo(pinNum + 1)  #  offset of 1 for the state linked to a button
+
+
+for btn in buttons:
+    btn.irq(button_pressed)  # callback when pressed or released
+state = State(99)  # to display HOME screen as default state
 refresh = 0
 while True:
     sleep(0.1)
-    for i, button in enumerate(buttons):
-        if button.value() != lastValues[i]:
-            lastValues[i] = button.value()
-            print(f"B{i} = {lastValues[i]}")
-
     if state.currentState == 0:
-        # default waiting state to wait for button to be pressed
-        if lastValues[0]:
-            state.changeTo(1)
-        elif lastValues[1]:
-            state.changeTo(2)
-        elif lastValues[2]:
-            state.changeTo(3)
-        elif lastValues[3]:
-            state.changeTo(4)
+        if refresh >= 5:
+            state.changeToDefault()
+            refresh = 0
         else:
-            if refresh >= 5:
-                state.changeTo(99)
-                refresh = 0
-            else:
-                refresh += 1
-        # wait for button to be released
-        allReleased()
-
+            refresh += 1
     # Action for button 1
     elif state.currentState == 1:
         if state.firstTime:
             wlan = connect_to_WIFI()
             state.firstTime = False
-        if sum(lastValues) > 0:
-            # a button is pressed: let's go back to main screen
+        elif sum(lastValues) > 0:
+            # any button is pressed: let's go back to main screen
             state.changeToDefault()
 
     # Action for button 2
@@ -115,20 +111,21 @@ while True:
                        title="Moisture",
                        button3="Read", button4="HOME")
             state.firstTime = False
-        if lastValues[3]:
+        elif lastValues[3]:
             # button4: let's go back to main screen
             state.changeToDefault()
         elif lastValues[2]:
+            # button3: read again
             state.firstTime = True
 
     # Action for button 3
     elif state.currentState == 3:
         if state.firstTime:
-            dis.screen("Press STOP", button3="STOP")
+            dis.screen("Press STOP", button4="STOP")
             buzzer.on()
             state.firstTime = False
-        if lastValues[2]:
-            # button3: let's go back to main screen
+        elif lastValues[3]:
+            # button4 pressed: let's go back to main screen
             buzzer.off()
             state.changeToDefault()
 
@@ -143,7 +140,7 @@ while True:
 Temp: {temperature}C
 Humidity: {humidity}%""", button4="Home")
             state.firstTime = False
-        if lastValues[3]:
+        elif lastValues[3]:
             # button4: let's go back to main screen
             state.changeToDefault()
 
