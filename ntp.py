@@ -28,7 +28,7 @@ def setClock(tz=0):
         res = s.sendto(NTP_QUERY, addr)
         msg = s.recv(48)
     except:
-        print("No response received from %s." % NTP_HOST)
+        print("No response received from", NTP_HOST)
     finally:
         s.close()
     try:

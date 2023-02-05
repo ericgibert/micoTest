@@ -3,12 +3,12 @@
 from micropython import const
 from machine import Pin, ADC
 from time import sleep, localtime
-import network
 from ntp import setClock
-from ssids import SSIDs
+from uwifi import uWifi
 from display import Display
 from dht import DHT11
 from state import State
+from logger import Logger
 
 # pins and hardware definitions
 onboard_led = Pin("LED", Pin.OUT)
@@ -16,7 +16,7 @@ dis = Display(0, 17, 16) # ic2 port and pins
 # the 4 buttons around the screen
 NB_BUTTONS = const(4)
 buttons = [Pin(i, Pin.IN, Pin.PULL_DOWN) for i in range(NB_BUTTONS)]
-lastValues = [0] * NB_BUTTONS
+lastValues = [-1] * NB_BUTTONS
 # the 3 ACDs
 NB_ACDS = const(3)
 acds = [ADC(Pin(26)), ADC(Pin(27)), ADC(Pin(28))]  # pico's ACD pins
@@ -28,33 +28,15 @@ sensor = DHT11(Pin(15))
 
 DAYS=const( ('MON', "TUE", "WED", "THU", "FRI", 'SAT', "SUN") )
 
-def connect_to_WIFI():
-    global display
-    wlan = network.WLAN(network.STA_IF)
-    wlan.active(True)
-    for SSID, PASSWORD in SSIDs:
-        print("SSID ", SSID)
-        wlan.connect(SSID, PASSWORD)
-        # Wait for connect or fail
-        max_wait = 10
-        while max_wait > 0:
-            dis.multiLines(f"Connecting to\n{SSID}\n\n{11 - max_wait}/10")
-            if wlan.status() < 0 or wlan.status() >= 3:
-                sleep(1)
-                break
-            max_wait -= 1
-            print('waiting for connection...')
-            sleep(1)
-        if wlan.isconnected(): return wlan
-    return None
-
-
-wlan = connect_to_WIFI()
+wlan = uWifi(dis)
 if wlan:
     print("Connected:", wlan.ifconfig())
+    setClock(tz=+8)  #  need to better manage timezone, for now, clock is TZ ignorant
+    print("my mac address:", wlan.mac())
+    log = Logger(wlan.mac())
 else:
-    print("Trying to connect")
-setClock(tz=+8)  #  need to beeter manage timezone, for now, clock is TZ ignorant
+    print("Failed to connect any Wifi SSIDs")
+
 now = localtime()
 print("time:", now)
 
@@ -66,37 +48,41 @@ def allReleased():
         sleep(0.05)
 
 
-def button_pressed(pin):
-    """
-    Callback function when a button is pressed -->  change state accordingly
-    """
-    pinNum = buttons.index(pin)
-    lastValues[pinNum] = pin()
-    print(f"pin({pinNum}) = {pin()}")
-    if lastValues[pinNum]:  # pressed
-        if state.currentState == 0:
-            state.changeTo(pinNum + 1)  #  offset of 1 for the state linked to a button
-
-
-for btn in buttons:
-    btn.irq(button_pressed)  # callback when pressed or released
-state = State(99)  # to display HOME screen as default state
+state = State(99)  # to display HOME screen and get back to it after 5 seconds
 refresh = 0
 while True:
     sleep(0.1)
+    for i, button in enumerate(buttons):
+        if button.value() != lastValues[i]:
+            lastValues[i] = button.value()
+            print(f"B{i} = {lastValues[i]}")
+
     if state.currentState == 0:
-        if refresh >= 5:
-            state.changeToDefault()
-            refresh = 0
+        # default waiting state to wait for button to be pressed
+        if lastValues[0]:
+            state.changeTo(1)
+        elif lastValues[1]:
+            state.changeTo(2)
+        elif lastValues[2]:
+            state.changeTo(3)
+        elif lastValues[3]:
+            state.changeTo(4)
         else:
-            refresh += 1
+            if refresh >= 5:
+                state.changeTo(99)
+                refresh = 0
+            else:
+                refresh += 1
+        # wait for button to be released
+        allReleased()
+
     # Action for button 1
     elif state.currentState == 1:
         if state.firstTime:
-            wlan = connect_to_WIFI()
+            wlan = uWifi(dis)
             state.firstTime = False
-        elif sum(lastValues) > 0:
-            # any button is pressed: let's go back to main screen
+        if sum(lastValues) > 0:
+            # a button is pressed: let's go back to main screen
             state.changeToDefault()
 
     # Action for button 2
@@ -111,21 +97,20 @@ while True:
                        title="Moisture",
                        button3="Read", button4="HOME")
             state.firstTime = False
-        elif lastValues[3]:
+        if lastValues[3]:
             # button4: let's go back to main screen
             state.changeToDefault()
         elif lastValues[2]:
-            # button3: read again
             state.firstTime = True
 
     # Action for button 3
     elif state.currentState == 3:
         if state.firstTime:
-            dis.screen("Press STOP", button4="STOP")
+            dis.screen("Press STOP", button3="STOP")
             buzzer.on()
             state.firstTime = False
-        elif lastValues[3]:
-            # button4 pressed: let's go back to main screen
+        if lastValues[2]:
+            # button3: let's go back to main screen
             buzzer.off()
             state.changeToDefault()
 
@@ -139,8 +124,10 @@ while True:
             dis.screen(f"""{now[3]}:{now[4]:02}:{now[5]:02}
 Temp: {temperature}C
 Humidity: {humidity}%""", button4="Home")
+            log.add("DATA", "DHT11 temperature", temperature)
+            log.add("DATA", "DHT11 humidity", humidity)
             state.firstTime = False
-        elif lastValues[3]:
+        if lastValues[3]:
             # button4: let's go back to main screen
             state.changeToDefault()
 
@@ -151,7 +138,9 @@ Humidity: {humidity}%""", button4="Home")
         dis.screen(f""" {now[0]}-{now[1]:02}-{now[2]:02} {DAYS[now[6]]}
  {now[3]}:{now[4]:02}:{now[5]:02}
  Connected to
- {wlan.config("ssid") or "None"}""",
+ {wlan.ssid() or "None"}""",
                    button1="Wifi", button2="ACD", button3="Buzz", button4="DHT")
+        log.push()
         state.changeTo(0)
         allReleased()
+
