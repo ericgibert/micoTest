@@ -1,6 +1,14 @@
 """
 NTP utility to set date and time from Internet
-Connection to network is not covered here
+Connection to network is not covered here:  you must have connected first
+
+Usage: in your main.py, do the following:
+
+from ntp import setClock
+... Here you must connect to Wifi first ...
+setClock(tz=+8)     #  forces the Singaporean timezone at GMT+8:00
+now = time.localtime()   #  retrieves the time from the RTC
+
 """
 from micropython import const
 import socket

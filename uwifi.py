@@ -1,7 +1,15 @@
 """
 Module to allow the connection of a Oi Pico to a Wifi network
 - pre-requisite: a SSIDs list of pair (ssid, passwd) in a ssids module
--
+Example of ssids.py:
+
+from micropython import const
+SSIDs = const((
+    ("home ssid", 'password1'),
+    ("eric's phone", 'password2')
+    ))
+
+
 """
 from time import sleep
 import network
@@ -11,7 +19,7 @@ from ssids import SSIDs
 class uWifi:
     _wlan = None
 
-    def __init__(self, display):
+    def __init__(self, display=None):
         """
         Connects to a Wifi network looking through the possible ssids list
         """
@@ -24,7 +32,8 @@ class uWifi:
             # Wait for connect or fail
             for max_wait in range(10):
                 print('waiting for connection...', max_wait, "Status", self._wlan.status())
-                display.multiLines(f"Connecting to\n{SSID}\n\n{1 + max_wait}/10")
+                if display:
+                    display.multiLines(f"Connecting to\n{SSID}\n\n{1 + max_wait}/10")
                 if self._wlan.status() < 0 or self._wlan.status() >= 3:
                     # sleep(1)
                     break
