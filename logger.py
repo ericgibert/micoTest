@@ -11,21 +11,22 @@ Every Log entry will have the following structure:
 - calcValue: the result of a calculation from the raw value to calculated value
 
 """
-# from collections import deque
+from collections import deque
 import urequests
 from utime import time_ns, ticks_us
-from FIFOqueue import FIFOQueue
+# from FIFOqueue import FIFOQueue
 
 class uInfluxDBClient():
     """
     Small wrapper to send data to a remote InfluxDB
     WIFI Network connection must already be established
     """
-    def __init__(self, url, org, token=None):
+    def __init__(self, org, url=None, host=None, port=None, token=None):
         """
         Save the parameters for future calls
         """
-        self.url, self.org = url, org
+        self.org = org
+        self.url = url or f"http://{host}:{port}"
         self.token = token or "lfpFxGZ06BGjgiHZEqFyArU2p7FBHAnOtNzPak0HZT1hPCxv1eYA50c7XUorKRUoimFhL839PRVA3antbZeKEw=="
 
     def write_api(self, bucket, records):
@@ -51,16 +52,20 @@ class Logger:
         "rawValue": 0.0,    #  data field
         "calcValue": 0.0    #  data field
     }
-    logEntries = FIFOQueue()  # deque((), 1000)  #  FIFO queue accepting 3000 pending readings
+    
 
     def __init__(self, systemId, host="192.168.18.3", port="8086", org="Perso"):
+        """
         # connects to the database hosted on http://host:port
         # systemId: identfies the system either by a given name or by its mac address
-        #			this will be a measurement/database for InfluxDb
+        #           this will be a measurement/database for InfluxDb
+        """
+        self.logEntries = deque((), 1000)  #  FIFO queue accepting 1000 pending readings
+#         self.logEntries = FIFOQueue()  
         self.data["systemId"] = systemId
-        self.dbLogs = uInfluxDBClient(url=f"http://{host}:{port}", org=org)
+        self.dbLogs = uInfluxDBClient(host=host, port=port, org=org)
 
-    def map(self, e):
+    def mapping(self, e):
         """
         the map function transforms a Point as dict to a string for POSTing to InfluxDb
         """
@@ -76,28 +81,33 @@ calcValue={e["calcValue"]} \
         """
         Post/insert a new entry in the queue
         """
-        le = self.data
-        le["timestamp"] = time_ns()+ticks_us()
-        le["logType"], le["sensorId"], le["message"] = logType, sensorId, message
-        le["rawValue"] = float(rawValue)
-        le["calcValue"] = float(calcValue if calcValue is not None else rawValue)
-        self.logEntries.enqueue(le)
-        print("le=", le, "Q length:", len(self.logEntries))
+        point = { "systemId": self.data["systemId"]}      
+        point["timestamp"] = time_ns()+ticks_us()
+        point["logType"], point["sensorId"], point["message"] = logType, sensorId, message
+        point["rawValue"] = float(rawValue)
+        point["calcValue"] = float(calcValue or rawValue)
+        self.logEntries.append(point)   # .enqueue(point)
+#         print("point=", point, "Q length:", len(self.logEntries))
+#         print("peek", self.logEntries.peek())
 
     def push(self, bucket="Pico"):
         """
         Send log entry points to InfluxDB database
         """
+        if not self.logEntries: return
         data = []
+        print(len(self.logEntries), "points in Q to send to InfluxDb...", end="")
         while self.logEntries:
-            print("len=", len(self.logEntries))
-            point = self.logEntries.dequeue()
-            data.append(self.map(point))
-            print("Data point:", self.map(point), "len=", len(self.logEntries))
-        if data:
-            res = self.dbLogs.write_api(bucket=bucket, records=data)
-            print("API uRequest:", res.status_code)
-            print(data)
-            if res.status_code >= 300:
-                print(f"Error calling {self.dbLogs.url}/write?db={bucket}")
-                print(res.json())
+#             print("len=", len(self.logEntries))
+            point = self.logEntries.popleft()  #  .dequeue()
+#             print("before Data point:", point, "len=", len(self.logEntries))
+            data.append(self.mapping(point))
+#             print("after Data point:", self.mapping(point), "len=", len(self.logEntries))
+
+        # call InfluxDB API
+        res = self.dbLogs.write_api(bucket=bucket, records=data)
+        print("API response code:", res.status_code)
+        if res.status_code >= 300:
+            print(f"Error calling {self.dbLogs.url}/write?db={bucket}")
+            print(res.json())
+

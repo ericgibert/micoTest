@@ -1,8 +1,8 @@
 # Refer to https://github.com/dm03514/python-algorithms/tree/main/pyalgorithms/queues
 class Node:
-    def __init__(self, value, next=None):
+    def __init__(self, value, _next=None):
         self.value = value
-        self.next = next
+        self._next = _next
 
 
 class FIFOQueue():
@@ -27,8 +27,8 @@ class FIFOQueue():
             self._tail = self._head = node
         else:
             # append the item at the end of the queue i.e. put the item in line (FIFO)
-            self._tail.next = Node(value=item)
-            self._tail = self._tail.next
+            self._tail._next = Node(value=item)
+            self._tail = self._tail._next
         # always increment size
         self._size += 1
 
@@ -38,7 +38,7 @@ class FIFOQueue():
         # get the current head i.e. the FIRST in
         node = self._head
         # set the head to the next in line
-        self._head = self._head.next
+        self._head = self._head._next
         self._size -= 1
         if self._size == 0:
             # set the tail to empty
@@ -48,9 +48,12 @@ class FIFOQueue():
 
     def peek(self):
         if self._size == 0:
-            raise IndexError
+            return None
         return self._head.value
-
+    
     def __len__(self):
         return self._size
+    
+    def __bool__(self):
+        return self._size > 0
 

@@ -93,6 +93,7 @@ while True:
                 raw_value = acd.read_u16()
                 moisture = (max_moisture - raw_value) * 100 // (max_moisture - min_moisture)
                 mLines += f"""{i}: {moisture}% [{raw_value}]\n"""
+                log.add("DATA", f"ACD{i}", "moisture", raw_value, moisture)
             dis.screen(mLines,
                        title="Moisture",
                        button3="Read", button4="HOME")
@@ -112,6 +113,7 @@ while True:
         if lastValues[2]:
             # button3: let's go back to main screen
             buzzer.off()
+            if wlan: log.push()
             state.changeToDefault()
 
     # Action for button 4
@@ -124,8 +126,8 @@ while True:
             dis.screen(f"""{now[3]}:{now[4]:02}:{now[5]:02}
 Temp: {temperature}C
 Humidity: {humidity}%""", button4="Home")
-            log.add("DATA", "DHT11", "temperature", temperature)
-            log.add("DATA", "DHT11", "humidity", humidity)
+            log.add("DATA", "DHT11T", "temperature", temperature)
+            log.add("DATA", "DHT11H", "humidity", humidity)
             state.firstTime = False
         if lastValues[3]:
             # button4: let's go back to main screen
