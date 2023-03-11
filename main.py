@@ -124,8 +124,8 @@ while True:
             dis.screen(f"""{now[3]}:{now[4]:02}:{now[5]:02}
 Temp: {temperature}C
 Humidity: {humidity}%""", button4="Home")
-            log.add("DATA", "DHT11 temperature", temperature)
-            log.add("DATA", "DHT11 humidity", humidity)
+            log.add("DATA", "DHT11", "temperature", temperature)
+            log.add("DATA", "DHT11", "humidity", humidity)
             state.firstTime = False
         if lastValues[3]:
             # button4: let's go back to main screen
@@ -140,7 +140,7 @@ Humidity: {humidity}%""", button4="Home")
  Connected to
  {wlan.ssid() or "None"}""",
                    button1="Wifi", button2="ACD", button3="Buzz", button4="DHT")
-        log.push()
+        if wlan: log.push()
         state.changeTo(0)
         allReleased()
 

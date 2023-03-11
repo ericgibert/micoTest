@@ -49,7 +49,7 @@ class Logger:
         Post/insert a new entry in the systemId table of the Firebase RT database
         """
         le = self.data
-        le["timestamp"] = datetime.now(timezone.utc).isoformat()[:-6]+'Z'  # replace +00:00 by Z
+        le["timestamp"] = datetime.now(timezone.utc)  #.isoformat()[:-6]+'Z'  # replace +00:00 by Z
         le["logType"], le["sensorId"], le["message"] = logType, sensorId, message
         le["rawValue"] = rawValue
         le["calcValue"] = calcValue if calcValue is not None else rawValue
@@ -61,17 +61,23 @@ class Logger:
         """Connect to the database"""
         InfluxToken = token or "lfpFxGZ06BGjgiHZEqFyArU2p7FBHAnOtNzPak0HZT1hPCxv1eYA50c7XUorKRUoimFhL839PRVA3antbZeKEw=="
         self.dbLogs = InfluxDBClient(url=f"http://{host}:{port}", token=InfluxToken, org="Perso")
-        self.dbLogs.map = lambda e: {
-                                        "measurement": e["systemId"],
-                                        "tags": {'sensorId': e["sensorId"]},
-                                        "fields":{
-                                            'logType': e["logType"],
-                                            'timestamp': e["timestamp"],
-                                            'message': e["message"],
-                                            'rawValue': float(e["rawValue"]),
-                                            'calcValue': float(e["calcValue"])
-                                        }
-                                    }
+        self.dbLogs.map = lambda e: f"""{e["systemId"]},sensorId={e["sensorId"]} \
+logType="{e["logType"]}",\
+message="{e["message"]}",\
+rawValue={float(e["rawValue"])},\
+calcValue={float(e["calcValue"])} {int(e["timestamp"].timestamp()*1000000000.0)}\
+"""
+        # self.dbLogs.map = lambda e: {
+        #                                 "measurement": e["systemId"],
+        #                                 "tags": {'sensorId': e["sensorId"]},
+        #                                 "fields":{
+        #                                     'logType': e["logType"],
+        #                                     'timestamp': e["timestamp"],
+        #                                     'message': e["message"],
+        #                                     'rawValue': float(e["rawValue"]),
+        #                                     'calcValue': float(e["calcValue"])
+        #                                 }
+        #                             }
 
     # def connect_firebase(self):
     #     # Fetch the service account key JSON file contents
@@ -105,7 +111,8 @@ class Logger:
         # print("new log in Firebase", new_entry.key)
 
 if __name__ == "__main__":
-    from random import uniform
+    from random import uniform, seed
+    seed()
     SYSID = "mySysId"
     SENSOR = "sensor1"
     log = Logger(SYSID)
