@@ -11,14 +11,15 @@ Every Log entry will have the following structure:
 - calcValue: the result of a calculation from the raw value to calculated value
 
 """
-from collections import deque
+# from collections import deque
 import urequests
 from utime import time_ns, ticks_us
+from FIFOqueue import FIFOQueue
 
 class uInfluxDBClient():
     """
     Small wrapper to send data to a remote InfluxDB
-    Wifi Network connection must already be established
+    WIFI Network connection must already be established
     """
     def __init__(self, url, org, token=None):
         """
@@ -50,7 +51,7 @@ class Logger:
         "rawValue": 0.0,    #  data field
         "calcValue": 0.0    #  data field
     }
-    logEntries = deque((), 1000)  #  FIFO queue accepting 3000 pending readings
+    logEntries = FIFOQueue()  # deque((), 1000)  #  FIFO queue accepting 3000 pending readings
 
     def __init__(self, systemId, host="192.168.18.3", port="8086", org="Perso"):
         # connects to the database hosted on http://host:port
@@ -80,7 +81,7 @@ calcValue={e["calcValue"]} \
         le["logType"], le["sensorId"], le["message"] = logType, sensorId, message
         le["rawValue"] = float(rawValue)
         le["calcValue"] = float(calcValue if calcValue is not None else rawValue)
-        self.logEntries.append(le)
+        self.logEntries.enqueue(le)
         print("le=", le, "Q length:", len(self.logEntries))
 
     def push(self, bucket="Pico"):
@@ -90,7 +91,7 @@ calcValue={e["calcValue"]} \
         data = []
         while self.logEntries:
             print("len=", len(self.logEntries))
-            point = self.logEntries.popleft()
+            point = self.logEntries.dequeue()
             data.append(self.map(point))
             print("Data point:", self.map(point), "len=", len(self.logEntries))
         if data:
