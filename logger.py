@@ -14,6 +14,7 @@ Every Log entry will have the following structure:
 from collections import deque
 import urequests
 from utime import time_ns, ticks_us
+from ssids import influxDBsecrets, LOCALTZ
 # from FIFOqueue import FIFOQueue
 
 class uInfluxDBClient():
@@ -21,13 +22,14 @@ class uInfluxDBClient():
     Small wrapper to send data to a remote InfluxDB
     WIFI Network connection must already be established
     """
-    def __init__(self, org, url=None, host=None, port=None, token=None):
+    def __init__(self, org=None, url=None, host=None, port=None, token=None):
         """
         Save the parameters for future calls
+        Mandatory: either the url or both host and port
         """
-        self.org = org
-        self.url = url or f"http://{host}:{port}"
-        self.token = token or "lfpFxGZ06BGjgiHZEqFyArU2p7FBHAnOtNzPak0HZT1hPCxv1eYA50c7XUorKRUoimFhL839PRVA3antbZeKEw=="
+        self.org = org or influxDBsecrets["org"]
+        self.url = url or f"http://{host or influxDBsecrets['host']}:{port or influxDBsecrets['port']}"
+        self.token = token or influxDBsecrets["token"]
 
     def write_api(self, bucket, records):
         """
@@ -35,8 +37,24 @@ class uInfluxDBClient():
         records: A list of points/data to write in this bucket/database
         """
         url_write = f"{self.url}/write?db={bucket}"
-        response = urequests.post(url_write, data="\n".join(records), headers={'Authorization': f'Token {self.token}'})
+        response = urequests.post(url_write,
+                                  data="\n".join(records),
+                                  headers={'Authorization': f'Token {self.token}'} if self.token else {})
         return response
+
+    def health_api(self):
+        """
+        health check of the influxDb database access
+        """
+        url_health = f"{self.url}/health"
+        try: 
+            response = urequests.post(url_health,
+                                  headers={'Authorization': f'Token {self.token}'} if self.token else {})
+            res = response.status_code
+        except OSError as err:
+            res = 500
+        return res
+
 
 class Logger:
     """
@@ -96,7 +114,8 @@ calcValue={e["calcValue"]} \
         """
         Send log entry points to InfluxDB database
         """
-        if not self.logEntries: return
+        if not self.logEntries or self.dbLogs.health_api() != 200:
+            return
         data = []
         print(len(self.logEntries), "points in Q to send to InfluxDb...", end="")
         while self.logEntries:
@@ -104,7 +123,7 @@ calcValue={e["calcValue"]} \
             point = self.logEntries.popleft()  #  .dequeue()
 #             print("before Data point:", point, "len=", len(self.logEntries))
             data.append(self.mapping(point))
-#             print("after Data point:", self.mapping(point), "len=", len(self.logEntries))
+            print("after Data point:", self.mapping(point), "len=", len(self.logEntries))
 
         # call InfluxDB API
         res = self.dbLogs.write_api(bucket=bucket, records=data)
@@ -120,12 +139,16 @@ if __name__ == "__main__":
     
     wlan = uWifi()
     print(f"1 - gmtime: {gmtime()} <> localtime: {localtime()}  <>  Unix: {time()}")
-    setClock()
+    setClock(LOCALTZ)
     print(f"2 - gmtime: {gmtime()} <> localtime: {localtime()}  <>  Unix: {time()}")
     
     
     print("time_ns:", time_ns())
     print("ticks_us:", ticks_us())
     print("time_ns()+ticks_us():", time_ns()+ticks_us())
-    tz = 8
-    print("time_ns()+ticks_us() to GMT:", time_ns()+ticks_us()-tz*3_600_000_000_000)
+    print("time_ns()+ticks_us() to GMT:", time_ns()+ticks_us()-LOCALTZ*3_600_000_000_000)
+
+    print("=" * 50)
+    idb = uInfluxDBClient()
+    print("Health status code:", idb.health_api())
+
