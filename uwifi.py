@@ -39,7 +39,9 @@ class uWifi:
                     break
                 sleep(1)
             if self._wlan.isconnected():
-                print("Connected with ip:", self._wlan.ifconfig()[0])
+                print("Connected with self.ip:", self.ip)
+                if display:
+                    display.multiLines(f"Connected to\n{SSID}\nIP {self.ip}")
                 break
 
     def __bool__(self):
@@ -47,10 +49,12 @@ class uWifi:
 
     def ifconfig(self):
         return self._wlan.ifconfig()
-    
+
+    @property
     def ssid(self):
         return self._wlan.config("ssid")
 
+    @property
     def mac(self):
         try:
             mac = hexlify(self._wlan.config('mac'), ':').decode()
@@ -58,3 +62,16 @@ class uWifi:
             mac = ""
         return mac
 
+    @property
+    def ip(self):
+        try:
+            res = self.ifconfig()[0]
+        except IndexError:
+            res = "?.?.?.?"
+        return res
+
+if __name__ == "__main__":
+    wlan = uWifi()
+    if wlan:
+        print(f"Connected as {wlan.ip}")
+        print(f"MAC as {wlan.mac}")

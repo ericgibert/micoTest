@@ -1,14 +1,6 @@
 """
 NTP utility to set date and time from Internet
-Connection to network is not covered here:  you must have connected first
-
-Usage: in your main.py, do the following:
-
-from ntp import setClock
-... Here you must connect to Wifi first ...
-setClock(tz=+8)     #  forces the Singaporean timezone at GMT+8:00
-now = time.localtime()   #  retrieves the time from the RTC
-
+Connection to network is not covered here
 """
 from micropython import const
 import socket
@@ -45,5 +37,14 @@ def setClock(tz=0):
         RTC().datetime((tm[0], tm[1], tm[2], tm[6] + 1, tm[3], tm[4], tm[5], 0))
         print("In NTP:", tm, "with tz=", tz)
     except:
-        pass
+        print("Error")
     led.off()
+
+if __name__ == "__main__":
+    from uwifi import uWifi
+    from time import localtime,time
+    wlan = uWifi()
+    print(f"1 - gmtime: {gmtime()} <> localtime: {localtime()}  <>  Unix: {time()}")
+    setClock()
+    print(f"2 - gmtime: {gmtime()} <> localtime: {localtime()}  <>  Unix: {time()}")
+    

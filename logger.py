@@ -54,7 +54,7 @@ class Logger:
     }
     
 
-    def __init__(self, systemId, host="192.168.18.3", port="8086", org="Perso"):
+    def __init__(self, systemId, host="192.168.18.3", port="8086", org="Perso", tz=0):
         """
         # connects to the database hosted on http://host:port
         # systemId: identfies the system either by a given name or by its mac address
@@ -64,6 +64,7 @@ class Logger:
 #         self.logEntries = FIFOQueue()  
         self.data["systemId"] = systemId
         self.dbLogs = uInfluxDBClient(host=host, port=port, org=org)
+        self.tz = tz
 
     def mapping(self, e):
         """
@@ -82,11 +83,12 @@ calcValue={e["calcValue"]} \
         Post/insert a new entry in the queue
         """
         point = { "systemId": self.data["systemId"]}      
-        point["timestamp"] = time_ns()+ticks_us()
+        point["timestamp"] = time_ns()+ticks_us()-self.tz*3_600_000_000_000
         point["logType"], point["sensorId"], point["message"] = logType, sensorId, message
         point["rawValue"] = float(rawValue)
         point["calcValue"] = float(calcValue or rawValue)
         self.logEntries.append(point)   # .enqueue(point)
+        print("Point timestamp:", point["timestamp"])
 #         print("point=", point, "Q length:", len(self.logEntries))
 #         print("peek", self.logEntries.peek())
 
@@ -111,3 +113,19 @@ calcValue={e["calcValue"]} \
             print(f"Error calling {self.dbLogs.url}/write?db={bucket}")
             print(res.json())
 
+if __name__ == "__main__":
+    from uwifi import uWifi
+    from ntp import setClock
+    from time import localtime, time, gmtime
+    
+    wlan = uWifi()
+    print(f"1 - gmtime: {gmtime()} <> localtime: {localtime()}  <>  Unix: {time()}")
+    setClock()
+    print(f"2 - gmtime: {gmtime()} <> localtime: {localtime()}  <>  Unix: {time()}")
+    
+    
+    print("time_ns:", time_ns())
+    print("ticks_us:", ticks_us())
+    print("time_ns()+ticks_us():", time_ns()+ticks_us())
+    tz = 8
+    print("time_ns()+ticks_us() to GMT:", time_ns()+ticks_us()-tz*3_600_000_000_000)
