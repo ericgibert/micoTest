@@ -114,8 +114,9 @@ while True:
             state.firstTime = False
         if lastValues[2]:  # button3: let's go back to main screen
             buzzer.off()
-            if wlan: log.push()
-            state.changeToDefault()
+            state.changeTo(98) # send data if any to InfluxDb
+#             if wlan: log.push()
+#             state.changeToDefault()
 
     # Action for button 4
     elif state.currentState == 4:  #  read data from DHT11
@@ -139,6 +140,11 @@ Humidity: {humidity}%""", button3="Read", button4="Home")
             state.firstTime = True
             allReleased()
 
+    # request to send data to InfluxDb
+    elif state.currentState == 98:
+        if wlan: log.push()
+        state.changeToDefault()
+
     # default action
     elif state.currentState == 99:   # display the HOME screen and go to waiting a press (state = 0)
         now = localtime()
@@ -147,7 +153,7 @@ Humidity: {humidity}%""", button3="Read", button4="Home")
  Connected to
  {wlan.ssid or "None"}""", footer=f"{len(log.logEntries)}",
                    button1="Wifi", button2="ACD", button3="Buzz", button4="DHT")
-        if wlan: log.push()
+#         if wlan: log.push()
         state.changeTo(0)
         allReleased()
 

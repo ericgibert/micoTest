@@ -8,7 +8,7 @@ SCHEDULER = {
     #  state : (t1, t2, ..., tn)   in minutes
     2: (0, 15, 30, 45),
     4: (1, 16, 31, 46),
-    99: (9, 19, 29, 39, 49, 59)
+    98: (9, 19, 29, 39, 49, 59) # push data every 10 minutes
 }
 
 class State:

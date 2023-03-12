@@ -12,7 +12,7 @@ Every Log entry will have the following structure:
 
 """
 from collections import deque
-import urequests
+import urequests, socket
 from utime import time_ns, ticks_us
 from ssids import influxDBsecrets, LOCALTZ
 # from FIFOqueue import FIFOQueue
@@ -22,13 +22,14 @@ class uInfluxDBClient():
     Small wrapper to send data to a remote InfluxDB
     WIFI Network connection must already be established
     """
-    def __init__(self, org=None, url=None, host=None, port=None, token=None):
+    def __init__(self, org=None, host=None, port=None, token=None):
         """
         Save the parameters for future calls
         Mandatory: either the url or both host and port
         """
         self.org = org or influxDBsecrets["org"]
-        self.url = url or f"http://{host or influxDBsecrets['host']}:{port or influxDBsecrets['port']}"
+        self.host, self.port = host or influxDBsecrets['host'], int(port or influxDBsecrets['port'])
+        self.url = f"http://{self.host}:{self.port}"
         self.token = token or influxDBsecrets["token"]
 
     def write_api(self, bucket, records):
@@ -37,18 +38,34 @@ class uInfluxDBClient():
         records: A list of points/data to write in this bucket/database
         """
         url_write = f"{self.url}/write?db={bucket}"
-        response = urequests.post(url_write,
-                                  data="\n".join(records),
+        try:
+            response = urequests.post(url_write,
+                                  data="\n".join(records), timeout=5,
                                   headers={'Authorization': f'Token {self.token}'} if self.token else {})
-        return response
+            res = response.status_code
+        except OSError as err:
+            res = 500
+        return res
 
     def health_api(self):
         """
         health check of the influxDb database access
         """
+        # step 1: check the server is reachable
+        try:
+            s=socket.socket()
+            s.settimeout(3)
+            addr = socket.getaddrinfo(self.host, self.port)[0][-1]
+            s.connect(addr)
+        except OSError as err:
+#             print("Socket timeout", err)
+            return 500
+        finally:
+            s.close()              
+        # check the database is reachable
         url_health = f"{self.url}/health"
         try: 
-            response = urequests.post(url_health,
+            response = urequests.post(url_health, timeout=5,
                                   headers={'Authorization': f'Token {self.token}'} if self.token else {})
             res = response.status_code
         except OSError as err:
@@ -126,11 +143,11 @@ calcValue={e["calcValue"]} \
             print("after Data point:", self.mapping(point), "len=", len(self.logEntries))
 
         # call InfluxDB API
-        res = self.dbLogs.write_api(bucket=bucket, records=data)
-        print("API response code:", res.status_code)
-        if res.status_code >= 300:
+        status_code = self.dbLogs.write_api(bucket=bucket, records=data)
+        print("API response code:", status_code)
+        if status_code >= 300:
             print(f"Error calling {self.dbLogs.url}/write?db={bucket}")
-            print(res.json())
+
 
 if __name__ == "__main__":
     from uwifi import uWifi
