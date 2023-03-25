@@ -12,7 +12,8 @@ Every Log entry will have the following structure:
 
 """
 from collections import deque
-import urequests, socket
+import urequests
+import socket
 from utime import time_ns, ticks_us
 from ssids import influxDBsecrets, LOCALTZ
 # from FIFOqueue import FIFOQueue
@@ -22,15 +23,16 @@ class uInfluxDBClient():
     Small wrapper to send data to a remote InfluxDB
     WIFI Network connection must already be established
     """
-    def __init__(self, org=None, host=None, port=None, token=None):
+    def __init__(self, org=None, url=None, host=None, port=None, token=None):
         """
         Save the parameters for future calls
         Mandatory: either the url or both host and port
         """
         self.org = org or influxDBsecrets["org"]
         self.host, self.port = host or influxDBsecrets['host'], int(port or influxDBsecrets['port'])
-        self.url = f"http://{self.host}:{self.port}"
+        self.url = url or influxDBsecrets["url"] or f"http://{self.host}:{self.port}"
         self.token = token or influxDBsecrets["token"]
+        self.bucket = influxDBsecrets["bucket"]
 
     def write_api(self, bucket, records):
         """
@@ -58,7 +60,7 @@ class uInfluxDBClient():
             addr = socket.getaddrinfo(self.host, self.port)[0][-1]
             s.connect(addr)
         except OSError as err:
-#             print("Socket timeout", err)
+            print("Socket timeout", err)
             return 500
         finally:
             s.close()              
@@ -69,6 +71,7 @@ class uInfluxDBClient():
                                   headers={'Authorization': f'Token {self.token}'} if self.token else {})
             res = response.status_code
         except OSError as err:
+            primt("error 10001:", err)
             res = 500
         return res
 
@@ -104,6 +107,8 @@ class Logger:
     def mapping(self, e):
         """
         the map function transforms a Point as dict to a string for POSTing to InfluxDb
+        for the e dictionary to the inline string for a point:
+        28:cd:c1:07:e5:d5,sensorId=ACD2 logType="DATA",message="moisture",rawValue=46331.0,calcValue=29.0 1679738601965652859
         """
         return f"""{e["systemId"]},sensorId={e["sensorId"]} \
 logType="{e["logType"]}",\
@@ -124,14 +129,14 @@ calcValue={e["calcValue"]} \
         point["calcValue"] = float(calcValue or rawValue)
         self.logEntries.append(point)   # .enqueue(point)
         print("Point timestamp:", point["timestamp"])
-#         print("point=", point, "Q length:", len(self.logEntries))
+        print("point=", point, "Q length:", len(self.logEntries))
 #         print("peek", self.logEntries.peek())
 
-    def push(self, bucket="Pico"):
+    def push(self, bucket=None):
         """
         Send log entry points to InfluxDB database
         """
-        if not self.logEntries or self.dbLogs.health_api() != 200:
+        if not self.logEntries: # or self.dbLogs.health_api() != 200:
             return
         data = []
         print(len(self.logEntries), "points in Q to send to InfluxDb...", end="")
@@ -143,10 +148,10 @@ calcValue={e["calcValue"]} \
             print("after Data point:", self.mapping(point), "len=", len(self.logEntries))
 
         # call InfluxDB API
-        status_code = self.dbLogs.write_api(bucket=bucket, records=data)
+        status_code = self.dbLogs.write_api(bucket=bucket or self.dbLogs.bucket, records=data)
         print("API response code:", status_code)
         if status_code >= 300:
-            print(f"Error calling {self.dbLogs.url}/write?db={bucket}")
+            print(f"Error calling {self.dbLogs.url}/write?db={bucket or self.dbLogs.bucket}")
 
 
 if __name__ == "__main__":
@@ -167,5 +172,9 @@ if __name__ == "__main__":
 
     print("=" * 50)
     idb = uInfluxDBClient()
-    print("Health status code:", idb.health_api())
+    # print("Health status code:", idb.health_api())
+    print("=" * 50)
+    log = Logger(wlan.mac, tz=LOCALTZ)
+    log.add("DATA", "TestPC", "testing posting from PicoW", 1.23, 4.56)
+    log.push()
 
