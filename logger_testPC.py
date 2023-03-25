@@ -103,15 +103,13 @@ class Logger:
 
 if __name__ == "__main__":
     # write data in influxDB
-    # log = Logger("PRAJNA")
-    # log.add("DATA", "TestPC", "testing the posting of a point", 1.23, 4.56)
-    # log.push()
-
-
-
+    log = Logger("PRAJNA")
+    log.add("DATA", "TestPC", "testing the posting of a point", 1.23, 4.56)
+    log.push()
+    # query data from InfluxDb
     query = f"""SELECT *
     FROM 'PRAJNA'
-    WHERE time >= now() - interval '1 hour'"""
+    WHERE time >= now() - interval '2 hours'"""
     # AND ('bees' IS NOT NULL OR 'ants' IS NOT NULL)"""
 
     # Define the query client
@@ -137,7 +135,7 @@ if __name__ == "__main__":
 #     print(len(log.logEntries), bool(log.logEntries))
 #     log.add("INFO", SENSOR, "testing the logger", 1, round(uniform(0, 5.0), 2))
 #     print(len(log.logEntries), bool(log.logEntries))
-#     # send to Firebase
+#     # send to database
 #     log.push()
 #     # check that data
 #     query=f"""from(bucket: "Pico")
