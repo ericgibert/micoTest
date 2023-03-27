@@ -41,7 +41,7 @@ class uInfluxDBClient():
     def write_api(self, bucket, records):
         """
         bucket:  A created database in InfluxDb
-        records: A list of points/data to write in this bucket/database
+        records: A list of points/data to write in this bucket/database expressed as line protocol string
         """
         url_write = f"{self.url}/write?db={bucket or self.bucket}"
         try:
@@ -112,7 +112,7 @@ class Logger:
     def mapping(self, e):
         """
         the map function transforms a Point as dict to a string for POSTing to InfluxDb
-        for the e dictionary to the inline string expected by influxDb:
+        i.e. the e dictionary to the line protocol string expected by influxDb:
         28:cd:c1:07:e5:d5,sensorId=ACD2 logType="DATA",message="moisture",rawValue=46331.0,calcValue=29.0 1679738601965652859
         """
         return f"""{e["systemId"]},sensorId={e["sensorId"]} \
@@ -127,7 +127,7 @@ calcValue={e["calcValue"]} \
         """
         Post/insert a new entry in the queue.
         The queue will hold up to 1000 data points expressed as a dictionary.
-        creation of a local point variable to mask self.point --> prevent issue memory assignement
+        creation of a local point variable to mask self.point --> prevent issue memory assignment
         """
         point = {
             "systemId": self.point["systemId"],
@@ -136,7 +136,7 @@ calcValue={e["calcValue"]} \
             "sensorId": sensorId,
             "message": message,
             "rawValue": float(rawValue),
-            "calcValue": float(calcValue or rawValue)
+            "calcValue": float(calcValue if calcValue is not None else rawValue)
         }
         self.logEntries.append(point)   # .enqueue(point)
         print("Point timestamp:", point["timestamp"])  # for debugging, can be commented out later
@@ -152,10 +152,12 @@ calcValue={e["calcValue"]} \
         """
         if not self.logEntries: # or self.dbLogs.health_api() != 200:
             return
-        data = [] # buffer for all converted points to send to influxDb with write_api
+        data = []       # buffer for all converted points to send to influxDb with write_api
+        safeguard = []  # keep the dequeued points to repost them if the API call fails
         print(len(self.logEntries), "points in Q to send to InfluxDb...")
         while self.logEntries:
             point = self.logEntries.popleft()  #  .dequeue()
+            safeguard.append(point)
 #             print("point as dico:", point, "Q len=", len(self.logEntries))
             data.append(self.mapping(point))
             print("Data point:", self.mapping(point), "Q len=", len(self.logEntries))
@@ -165,6 +167,10 @@ calcValue={e["calcValue"]} \
         print("API response code:", status_code)
         if status_code >= 300:
             print(f"Error calling {self.dbLogs.url}/write?db={bucket or self.dbLogs.bucket}")
+            for point in safeguard:
+                self.logEntries.append(point)
+        return status_code
+            
 
 
 if __name__ == "__main__":

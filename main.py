@@ -33,10 +33,11 @@ wlan = uWifi(dis)
 if wlan:
     print("Connected:", wlan.ifconfig())
     setClock(tz=+8)  #  need to better manage timezone, for now, clock is TZ ignorant
-    print("my MAC address:", wlan.mac)
-    log = Logger(wlan.mac, tz=+8)  #  MAC address used a systemId i.e. InfluxDb database
 else:
     print("Failed to connect any Wifi SSIDs")
+    
+print("my MAC address:", wlan.mac)
+log = Logger(wlan.mac, tz=+8)  #  MAC address used a systemId i.e. InfluxDb database
 
 now = localtime()
 print("Local time:", now)
@@ -84,8 +85,8 @@ while True:
             wlan = uWifi(dis)
             state.firstTime = False
         if sum(lastValues) > 0:
-            # a button is pressed: let's go back to main screen
-            state.changeToDefault()
+            # a button is pressed
+            state.changeTo(98) # send data if any to InfluxDb
 
     # Action for button 2
     elif state.currentState == 2:  #  display the readings of all ACDs for moisture
@@ -115,8 +116,6 @@ while True:
         if lastValues[2]:  # button3: let's go back to main screen
             buzzer.off()
             state.changeTo(98) # send data if any to InfluxDb
-#             if wlan: log.push()
-#             state.changeToDefault()
 
     # Action for button 4
     elif state.currentState == 4:  #  read data from DHT11
@@ -142,7 +141,16 @@ Humidity: {humidity}%""", button3="Read", button4="Home")
 
     # request to send data to InfluxDb
     elif state.currentState == 98:
-        if wlan: log.push()
+        if len(log.logEntries) > 0:
+            if wlan:
+                dis.screen(f"Sending {len(log.logEntries)} pts")
+                http_code = log.push()
+                if http_code >= 300:
+                    dis.screen(f"""Failed to send.\nEnQ {len(log.logEntries)} pts""")
+                    sleep(3)
+            else:
+                dis.screen(f"""No internet\n{len(log.logEntries)} pts in Q""")
+                sleep(2)
         state.changeToDefault()
 
     # default action
