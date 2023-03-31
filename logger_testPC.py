@@ -23,21 +23,21 @@ class Logger:
     Connectivity with the Firebase Realtime database
     Offer helpers to add or retrieve log entries
     """
-    data = {
-        "timestamp": None,
-        "logType": "INFO",
-        "systemId": None,
-        "sensorId": None,
-        "message": "",
-        "rawValue": 0.0,
-        "calcValue": 0.0
+    point = {
+        "timestamp": 1679738601965652859,   # timestamp when the data are given to the Logger ==> time in influxDb
+        "logType": "DATA",                  # INFO, WARNING, ERROR, DATA (default)
+        "systemId": "28:cd:c1:07:e5:d5",    # influxDB measurement/database: one per system or PicoW
+        "sensorId": "ACD2",                 # influxDB Tag/key for one sensor reading by the PicoW
+        "message": "moisture in geranium pot",  # influxDB data field: description of this sensor
+        "rawValue": 46331.0,        # influxDB data field: raw value when PicoW reads the sensor or the PIN
+        "calcValue": 29.0           # influxDB data field: converted raw value to proper value or same a raw if no conversion applies
     }
     logEntries = deque((), 10_000)  #  FIFO queue
 
     def __init__(self, systemId):
         # connects to the database
-        # identfies the system either by a given name or by its mac address
-        self.data["systemId"] = systemId
+        # identifies the system either by a given name or by its mac address
+        self.point["systemId"] = systemId
         self.dbLogs = InfluxDBClient(url=influxDBsecrets["url"],
                                      token=influxDBsecrets["token"],
                                      org=influxDBsecrets["org"])
@@ -48,22 +48,21 @@ class Logger:
         Post/insert a new entry in the systemId table of the Firebase RT database
         PRAJNA,sensorId=TestPC logType="DATA",message="testing the posting of a point",rawValue=1.23,calcValue=4.56 1679723496728941000
         """
-        point = { "systemId": self.data["systemId"]}
-        point["timestamp"] = int(time.time() * 1_000_000_000) #datetime.now(timezone.utc)
-        point["logType"], point["sensorId"], point["message"] = logType, sensorId, message
-        point["rawValue"] = float(rawValue)
-        point["calcValue"] = float(calcValue or rawValue)
+        point = {
+            "systemId": self.point["systemId"],
+            "timestamp": int(time.time() * 1_000_000_000), # nanosecond
+            "logType": logType,
+            "sensorId": sensorId,
+            "message": message,
+            "rawValue": float(rawValue),
+            "calcValue": float(calcValue if calcValue is not None else rawValue)
+        }
         self.logEntries.append(point)   # .enqueue(point)
         print("Point timestamp:", point["timestamp"])
 
-    # def connect_influxDb(self, host="localhost", port="8086", token=None):
-    #     """Connect to the database"""
-    #     InfluxToken = token or "lfpFxGZ06BGjgiHZEqFyArU2p7FBHAnOtNzPak0HZT1hPCxv1eYA50c7XUorKRUoimFhL839PRVA3antbZeKEw=="
-    #     self.dbLogs = InfluxDBClient(url=f"http://{host}:{port}", token=InfluxToken, org="Perso")
-
     def mapping(self, e):
         """
-        the map function transforms a Point as dict to a string for POSTing to InfluxDb
+        Transforms Logger instance into an InfluxDb Point dictionary
         """
         return {
             "measurement": e['systemId'],
@@ -77,6 +76,13 @@ class Logger:
             }
         }
 
+    def toLineProtocol(self, influxPoint):
+        """
+        Serialize an InfluxDb Point dictionary into one line protocol string
+        """
+        _tags = ",".join([f'{k}="{v}"' for k,v in influxPoint["tags"].items()])
+        _fields = ",".join([f'{k}="{v}"' if isinstance(v, str) else f'{k}={v}' for k, v in influxPoint["fields"].items()])
+        return f"""{influxPoint["measurement"]},{_tags} {_fields} {influxPoint["time"]}"""
 
     def push(self, bucket=None):
         if not self.logEntries: # or self.dbLogs.health_api() != 200:
@@ -105,6 +111,11 @@ if __name__ == "__main__":
     # write data in influxDB
     log = Logger("PRAJNA")
     log.add("DATA", "TestPC", "testing the posting of a point", 1.23, 4.56)
+    e = log.logEntries[0]
+    point = log.mapping(e)
+    print("Point dico:", point)
+    line = log.toLineProtocol(point)
+    print("As Line Protocol:", line)
     log.push()
     # query data from InfluxDb
     query = f"""SELECT *
@@ -123,8 +134,8 @@ if __name__ == "__main__":
     reader = query_client.do_get(info.endpoints[0].ticket)
 
     # Convert to dataframe
-    data = reader.read_all()
-    df = data.to_pandas().sort_values(by="time")
+    point = reader.read_all()
+    df = point.to_pandas().sort_values(by="time")
     print(df)
 
 #     from random import uniform, seed
