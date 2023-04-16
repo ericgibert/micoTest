@@ -8,7 +8,7 @@ from micropython import const
 from dht import DHT11, DHT22
 
 class Sensor:
-    id = "1234"         # sensor Id
+    id = "1234"         # sensorId
     rawValue = 0.0
     calcValue = 0.0
 
@@ -19,7 +19,7 @@ class Sensor:
         """default formula is simply using the rawValue for the calculated one"""
         self.calcValue = self.rawValue
 
-    def __repl__(self):
+    def __str__(self):
         """representation"""
         return f"Sensor({self.id})"
 
