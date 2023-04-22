@@ -30,11 +30,6 @@ airSensor = DHT("DHT11", 11, 15)
 # buzzer
 buzzer = Pin(12, Pin.OUT)
 
-
-sensors = (
-
-)
-
 DAYS=const( ('MON', "TUE", "WED", "THU", "FRI", 'SAT', "SUN") )
 
 # first connection to WIFI
@@ -102,8 +97,6 @@ while True:
         if state.firstTime:
             mLines = ""
             for i, acd in enumerate(acds):
-                # raw_value = acd.read_u16()
-                # moisture = (max_moisture - raw_value) * 100 // (max_moisture - min_moisture)
                 moisture = acd.read()
                 mLines += f"""{i}: {moisture}% [{acd.rawValue}]\n"""
                 log.add("DATA", acd.id, "moisture", acd.rawValue, moisture)

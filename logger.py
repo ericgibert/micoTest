@@ -139,7 +139,7 @@ calcValue={e["calcValue"]} \
             "calcValue": float(calcValue if calcValue is not None else rawValue)
         }
         self.logEntries.append(point)   # .enqueue(point)
-        print("Point timestamp:", point["timestamp"])  # for debugging, can be commented out later
+        # print("Point timestamp:", point["timestamp"])  # for debugging, can be commented out later
         print("point=", point, "Q length:", len(self.logEntries)) # for debugging, can be commented out later
 
 

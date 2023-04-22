@@ -108,18 +108,22 @@ class Logger:
         # print("new log in Firebase", new_entry.key)
 
 if __name__ == "__main__":
-    # write data in influxDB
-    log = Logger("PRAJNA")
-    log.add("DATA", "TestPC", "testing the posting of a point", 1.23, 4.56)
-    e = log.logEntries[0]
-    point = log.mapping(e)
-    print("Point dico:", point)
-    line = log.toLineProtocol(point)
-    print("As Line Protocol:", line)
-    log.push()
+    # -- write data in influxDB --
+    # log = Logger("PRAJNA")
+    # log.add("DATA", "TestPC", "testing the posting of a point", 1.23, 4.56)
+    # e = log.logEntries[0]
+    # point = log.mapping(e)
+    # print("Point dico:", point)
+    # line = log.toLineProtocol(point)
+    # print("As Line Protocol:", line)
+    # log.push()
+
+
     # query data from InfluxDb
+    PC = "PRAJNA"
+    PICO = "28:cd:c1:07:e5:d5"
     query = f"""SELECT *
-    FROM 'PRAJNA'
+    FROM "{PICO}"
     WHERE time >= now() - interval '2 hours'"""
     # AND ('bees' IS NOT NULL OR 'ants' IS NOT NULL)"""
 
@@ -137,40 +141,3 @@ if __name__ == "__main__":
     point = reader.read_all()
     df = point.to_pandas().sort_values(by="time")
     print(df)
-
-#     from random import uniform, seed
-#     seed()
-#     SYSID = "mySysId"
-#     SENSOR = "sensor1"
-#     log = Logger(SYSID)
-#     print(len(log.logEntries), bool(log.logEntries))
-#     log.add("INFO", SENSOR, "testing the logger", 1, round(uniform(0, 5.0), 2))
-#     print(len(log.logEntries), bool(log.logEntries))
-#     # send to database
-#     log.push()
-#     # check that data
-#     query=f"""from(bucket: "Pico")
-# |> range(start: -90m)
-# |> filter(fn: (r) => r["_measurement"] == "{SYSID}")
-# |> filter(fn: (r) => r["sensorId"] == "{SENSOR}")"""
-#
-#     log.connect_influxDb()
-#     result = log.dbLogs.query_api().query(org='Perso', query=query)
-#     results = []
-#     for table in result:
-#         for record in table.records:
-#             results.append((record.get_field(), record.get_value()))
-#     print("-" * 80)
-#     print(results)
-
-
-    # with dbLogs as client:
-    #     with client.query_api() as reader:
-    #         tables = reader.query(org='Perso', query=query)
-    # tables = log.dbLogs.query_api().query(org='Perso', query=query)
-    # # Serialize to values
-    # output = tables.to_values(columns=['sensorId', 'calcValue'])
-    # print(output)
-
-
-

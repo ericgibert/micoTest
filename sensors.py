@@ -44,7 +44,7 @@ class MakerSoilMoisture(Sensor):
     """
     def __init__(self, id, pin):
         Sensor.__init__(self, id)
-        self.acd = ADC(Pin(pin))
+        self._adc = ADC(Pin(pin))
 
     def calculate(self):
         """transform the reading in Volt into the moisture %"""
@@ -52,7 +52,7 @@ class MakerSoilMoisture(Sensor):
         return min(100.0, max(0.0, calcValue))
 
     def read(self):
-        self.rawValue = self.acd.read_u16()
+        self.rawValue = self._adc.read_u16()
         self.calcValue = self.calculate()
         return self.calcValue
 
@@ -62,8 +62,6 @@ class DHT:
     Since the sensor captures both air temperature and humidity, one reading is performed
     """
     lastRead = time() - 4
-    temperature = 0.0
-    humidity = 0.0
     def __init__(self, id, serie, pin):
         """
         serie: either 11 or 22 to choose between DHT11 and DHT22
@@ -79,21 +77,29 @@ class DHT:
         if time() - self.lastRead > 3:
             try:
                 self.dht.measure()
-                self.DHTT.rawValue = self.DHTT.calcValue = float(self.dht.temperature())
-                self.DHTH.rawValue = self.DHTH.calcValue = float(self.dht.humidity())
+                self.DHTT.rawValue = self.DHTT.calcValue = self.dht.temperature()
+                self.DHTH.rawValue = self.DHTH.calcValue = self.dht.humidity()
             except OSError as err:
                 pass
             else:
                 self.lastRead = time()
 
+    @property
+    def temperature(self):
+        return self.DHTT.calcValue
+
+    @property
+    def humidity(self):
+        return self.DHTH.calcValue
 
 if __name__ == "__main__":
-    s = MakerSoilMoisture("ACD01", 26)
-    s.read()
-    print(s.rawValue, f"{s.calcValue}%")
+    acds = (MakerSoilMoisture("ACD0", 26), MakerSoilMoisture("ACD1", 27), MakerSoilMoisture("ACD2", 28))
+    for s in acds:
+        moisture = s.read()
+        print(s.id, s.rawValue, f"{moisture}%")
 
     dht = DHT("DHT", 11, 15)
     dht.read()
-    print("temperature:", dht.DHTT.calcValue)
+    print("temperature:", dht.temperature)
     dht.read()
-    print("humidity:", dht.DHTH.calcValue)
+    print("humidity:", dht.humidity)
