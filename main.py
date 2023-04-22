@@ -1,30 +1,39 @@
-# testing internet connection
-# looking for different SSID thru a hidden file
+"""
+I AM THIRSTY!
+
+Application to monitor the moisture level in the soil of 3 plants.
+- Readings are uploaded in InfluxDB database
+- Other sensor: DHT for air temperature and humidity
+"""
 from micropython import const
-from machine import Pin, ADC
+from machine import Pin
 from time import sleep, localtime
+
 from ntp import setClock
 from uwifi import uWifi
 from display import Display
-from dht import DHT11
+from sensors import MakerSoilMoisture, DHT
 from state import State
 from logger import Logger
 
 # pins and hardware definitions
 onboard_led = Pin("LED", Pin.OUT)
-dis = Display(0, 17, 16) # ic2 port and pins for the mini LCD display
+# ic2 port and pins for the mini LCD display
+dis = Display(0, 17, 16)
 # the 4 buttons around the screen
 NB_BUTTONS = const(4)
 buttons = [Pin(i, Pin.IN, Pin.PULL_DOWN) for i in range(NB_BUTTONS)]
 lastValues = [-1] * NB_BUTTONS
-# the 3 ACDs
-NB_ACDS = const(3)
-acds = [ADC(Pin(26)), ADC(Pin(27)), ADC(Pin(28))]  # pico's ACD pins
-min_moisture = const(0)
-max_moisture = const(65535)
-# buzzer and DHT11
+# the 3 ACDs and DHT11
+acds = (MakerSoilMoisture("ACD0", 26), MakerSoilMoisture("ACD1", 27), MakerSoilMoisture("ACD2", 28))
+airSensor = DHT("DHT11", 11, 15)
+# buzzer
 buzzer = Pin(12, Pin.OUT)
-sensor = DHT11(Pin(15))
+
+
+sensors = (
+
+)
 
 DAYS=const( ('MON', "TUE", "WED", "THU", "FRI", 'SAT', "SUN") )
 
@@ -79,8 +88,8 @@ while True:
         # else ensure that all buttons are released
         allReleased()
 
-    # Action for button 1
-    elif state.currentState == 1:  # look for a WIFI connection
+    # Action for button 1: look for a WIFI connection
+    elif state.currentState == 1:
         if state.firstTime:
             wlan = uWifi(dis)
             state.firstTime = False
@@ -88,15 +97,16 @@ while True:
             # a button is pressed
             state.changeTo(98) # send data if any to InfluxDb
 
-    # Action for button 2
-    elif state.currentState == 2:  #  display the readings of all ACDs for moisture
+    # Action for button 2: display the readings of all ACDs for moisture
+    elif state.currentState == 2:
         if state.firstTime:
             mLines = ""
             for i, acd in enumerate(acds):
-                raw_value = acd.read_u16()
-                moisture = (max_moisture - raw_value) * 100 // (max_moisture - min_moisture)
-                mLines += f"""{i}: {moisture}% [{raw_value}]\n"""
-                log.add("DATA", f"ACD{i}", "moisture", raw_value, moisture)
+                # raw_value = acd.read_u16()
+                # moisture = (max_moisture - raw_value) * 100 // (max_moisture - min_moisture)
+                moisture = acd.read()
+                mLines += f"""{i}: {moisture}% [{acd.rawValue}]\n"""
+                log.add("DATA", acd.id, "moisture", acd.rawValue, moisture)
             dis.screen(mLines,
                        title="Moisture",
                        button3="Read", button4="HOME")
@@ -107,8 +117,8 @@ while True:
             state.firstTime = True
             allReleased()
 
-    # Action for button 3
-    elif state.currentState == 3:  #  buzzer - force push all logs to InfluxDb
+    # Action for button 3: buzzer - force push all logs to InfluxDb
+    elif state.currentState == 3:
         if state.firstTime:
             dis.screen("Press STOP", button3="STOP")
             buzzer.on()
@@ -117,21 +127,21 @@ while True:
             buzzer.off()
             state.changeTo(98) # send data if any to InfluxDb
 
-    # Action for button 4
-    elif state.currentState == 4:  #  read data from DHT11
+    # Action for button 4: read data from DHT11
+    elif state.currentState == 4:
         if state.firstTime:
             now = localtime()
             try:
-                sensor.measure()
+                airSensor.read()
             except OSError as err:
                 continue
-            temperature = sensor.temperature()
-            humidity = sensor.humidity()
+            temperature = airSensor.DHTT.read()
+            humidity = airSensor.DHTH.read()
             dis.screen(f"""{now[3]}:{now[4]:02}:{now[5]:02}
 Temp: {temperature}C
 Humidity: {humidity}%""", button3="Read", button4="Home")
-            log.add("DATA", "DHT11T", "temperature", temperature)
-            log.add("DATA", "DHT11H", "humidity", humidity)
+            log.add("DATA", airSensor.DHTT.id, "temperature", temperature)
+            log.add("DATA", airSensor.DHTH.id, "humidity", humidity)
             state.firstTime = False
         if lastValues[3]:    # button4: let's go back to main screen
             state.changeToDefault()

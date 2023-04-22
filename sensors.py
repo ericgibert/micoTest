@@ -15,6 +15,10 @@ class Sensor:
     def __init__(self, id):
         self.id = id
 
+    def read(self):
+        """default behaviour: calcValue is returned"""
+        return self.calcValue
+
     def calculate(self):
         """default formula is simply using the rawValue for the calculated one"""
         self.calcValue = self.rawValue
@@ -50,8 +54,9 @@ class MakerSoilMoisture(Sensor):
     def read(self):
         self.rawValue = self.acd.read_u16()
         self.calcValue = self.calculate()
+        return self.calcValue
 
-class DHT(Sensor):
+class DHT:
     """
     Supports both DHT11 and DHT 22
     Since the sensor captures both air temperature and humidity, one reading is performed
@@ -59,11 +64,13 @@ class DHT(Sensor):
     lastRead = time() - 4
     temperature = 0.0
     humidity = 0.0
-    def __init__(self, serie, pin):
+    def __init__(self, id, serie, pin):
         """
         serie: either 11 or 22 to choose between DHT11 and DHT22
         """
         self.dht = DHT11(Pin(pin)) if serie == 11 else DHT22(Pin(pin))
+        self.DHTT = Sensor(f"{id}_T")
+        self.DHTH = Sensor(f"{id}_H")
 
     def read(self):
         """
@@ -72,48 +79,21 @@ class DHT(Sensor):
         if time() - self.lastRead > 3:
             try:
                 self.dht.measure()
-                self.temperature = self.dht.temperature()
-                self.humidity = self.dht.humidity()
+                self.DHTT.rawValue = self.DHTT.calcValue = float(self.dht.temperature())
+                self.DHTH.rawValue = self.DHTH.calcValue = float(self.dht.humidity())
             except OSError as err:
                 pass
             else:
                 self.lastRead = time()
 
-class DHTT(Sensor):
-    """Only the air temperature"""
-    def __init__(self, id, dht):
-        """Must create first a DHT object"""
-        Sensor.__init__(self, id)
-        self.dht = dht
-
-    def read(self):
-        self.dht.read()
-        self.rawValue = self.dht.temperature
-        self.calculate()
-
-
-class DHTH(Sensor):
-    """Only the air humidity"""
-
-    def __init__(self, id, dht):
-        """Must create first a DHT object"""
-        Sensor.__init__(self, id)
-        self.dht = dht
-
-    def read(self):
-        self.dht.read()
-        self.rawValue = self.dht.humidity
-        self.calculate()
 
 if __name__ == "__main__":
     s = MakerSoilMoisture("ACD01", 26)
     s.read()
     print(s.rawValue, f"{s.calcValue}%")
 
-    dht = DHT(11, 15)
-    dhtt = DHTT("temperature", dht)
-    dhth = DHTH("humidity", dht)
-    dhtt.read()
-    print("temperature:", dhtt.calcValue)
-    dhth.read()
-    print("humidity:", dhth.calcValue)
+    dht = DHT("DHT", 11, 15)
+    dht.read()
+    print("temperature:", dht.DHTT.calcValue)
+    dht.read()
+    print("humidity:", dht.DHTH.calcValue)
