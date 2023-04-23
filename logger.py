@@ -183,7 +183,6 @@ calcValue={e["calcValue"]} \
         # push the remaining points below 20
         status_code = self.push_slice(bucket or self.dbLogs.bucket)
         return status_code
-            
 
 
 if __name__ == "__main__":

@@ -6,8 +6,9 @@ Application to monitor the moisture level in the soil of 3 plants.
 - Other sensor: DHT for air temperature and humidity
 """
 from micropython import const
-from machine import Pin
+from machine import Pin, Timer
 from time import sleep, localtime
+import _thread
 
 from ntp import setClock
 from uwifi import uWifi
@@ -31,20 +32,57 @@ airSensor = DHT("DHT11", 11, 15)
 buzzer = Pin(12, Pin.OUT)
 
 DAYS=const( ('MON', "TUE", "WED", "THU", "FRI", 'SAT', "SUN") )
+wlan = None
 
-# first connection to WIFI
-wlan = uWifi(dis)
-if wlan:
-    print("Connected:", wlan.ifconfig())
-    setClock(tz=+8)  #  need to better manage timezone, for now, clock is TZ ignorant
-else:
-    print("Failed to connect any Wifi SSIDs")
-    
+
+def connectWifi():
+    """
+    Connection to Wifi
+    Get localtime to the Pico's clock
+    Need to do a full reset on current Wifi to start a fresh connection
+    """
+    global wlan
+    onboard_led.on()
+    wlan = uWifi(dis)
+    if wlan:
+        print("Connected:", wlan.ifconfig())
+    else:
+        print("Failed to connect any Wifi SSIDs")
+
+
+def disconnectWifi():
+    global wlan
+    try:
+        # wlan._wlan.active(False)
+        wlan._wlan.disconnect()
+    except:
+        pass
+    finally:
+        onboard_led.off()
+
+connectWifi()
+try:
+    setClock(tz=+8)  # need to better manage timezone, for now, clock is TZ ignorant
+except:
+    pass
 print("my MAC address:", wlan.mac)
 log = Logger(wlan.mac, tz=+8)  #  MAC address used a systemId i.e. InfluxDb database
-
 now = localtime()
 print("Local time:", now)
+disconnectWifi()
+
+# start a second thread to send data thru Wifi automatically
+def core1_sendData(timer=None):
+    if len(log.logEntries) > 0:
+        print("Core1 thread...")
+        connectWifi()
+        log.push()
+        disconnectWifi()
+        print("Data sent")
+
+        
+# second_thread = _thread.start_new_thread(core1_sendData, ())
+second_thread = Timer(mode=Timer.PERIODIC, period= 10 * 60 * 1000, callback=core1_sendData)
 
 def allReleased():
     """
@@ -86,7 +124,8 @@ while True:
     # Action for button 1: look for a WIFI connection
     elif state.currentState == 1:
         if state.firstTime:
-            wlan = uWifi(dis)
+            # wlan = uWifi(dis)
+            connectWifi()
             state.firstTime = False
         if sum(lastValues) > 0:
             # a button is pressed
@@ -145,6 +184,8 @@ Humidity: {humidity}%""", button3="Read", button4="Home")
     # request to send data to InfluxDb
     elif state.currentState == 98:
         if len(log.logEntries) > 0:
+            if not wlan:
+                connectWifi()
             if wlan:
                 dis.screen(f"Sending {len(log.logEntries)} pts")
                 http_code = log.push()
@@ -154,6 +195,7 @@ Humidity: {humidity}%""", button3="Read", button4="Home")
             else:
                 dis.screen(f"""No internet\n{len(log.logEntries)} pts in Q""")
                 sleep(2)
+            disconnectWifi()
         state.changeToDefault()
 
     # default action
