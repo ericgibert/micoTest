@@ -9,12 +9,12 @@ except ModuleNotFoundError:
 
 # influxDb on the CLoud
 influxDBsecrets = {
-    "token": "Voemjd8i.............................................hfU8Vj2wLy7z54uuajwTQ==",
+    "token": "Voemjd8iRFpigEaDcBPB_EwKgBy_5W7YSnogsCkRvSIrA-EB7RXEky-TgM9jbZCXOhfU8Vj2wLy7z54uuajwTQ==",
     "url": "https://us-east-1-1.aws.cloud2.influxdata.com",
     "host": "us-east-1-1.aws.cloud2.influxdata.com",
     "port": 443,
-    "org": "<Org>",
-    "bucket": "<bucket>"
+    "org": "Perso",
+    "bucket": "Pico/autogen"
 }
 
 # local database on Linux server

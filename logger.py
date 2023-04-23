@@ -11,6 +11,7 @@ Every Log entry will have the following structure:
 - calcValue: the result of a calculation from the raw value to convert the raw value to the final value
 
 """
+from micropython import const
 from collections import deque
 import urequests
 import socket
@@ -50,6 +51,7 @@ class uInfluxDBClient():
                                   headers={'Authorization': f'Token {self.token}'} if self.token else {})
             res = response.status_code
         except OSError as err:
+            print("***", err)
             res = 500
         return res
 
@@ -143,6 +145,25 @@ calcValue={e["calcValue"]} \
         print("point=", point, "Q length:", len(self.logEntries)) # for debugging, can be commented out later
 
 
+    def push_slice(self, bucket, slice_size=None):
+        """Send 'slice_size' points to database"""
+        slice_size = slice_size or len(self.logEntries)  # replace None by the current Q length
+        data = []       # buffer for all converted points to send to influxDb with write_api
+        safeguard = []  # keep the dequeued points to repost them if the API call fails
+        for pt in range(slice_size):
+            point = self.logEntries.popleft()  #  .dequeue()
+            safeguard.append(point)
+            data.append(self.mapping(point))
+            print(f"Data point {len(self.logEntries)}: {self.mapping(point)}")
+        # call InfluxDB API
+        status_code = self.dbLogs.write_api(bucket=bucket, records=data)
+        print("API response code:", status_code)
+        if status_code >= 300:
+            print(f"Error calling {self.dbLogs.url}/write?db={bucket}")
+            for point in safeguard:
+                self.logEntries.append(point)
+        return status_code
+
     def push(self, bucket=None):
         """
         Send log entry points to InfluxDB database
@@ -152,23 +173,15 @@ calcValue={e["calcValue"]} \
         """
         if not self.logEntries: # or self.dbLogs.health_api() != 200:
             return
-        data = []       # buffer for all converted points to send to influxDb with write_api
-        safeguard = []  # keep the dequeued points to repost them if the API call fails
+        # sending points 20 by 20 to avoid overloading the API's body
         print(len(self.logEntries), "points in Q to send to InfluxDb...")
-        while self.logEntries:
-            point = self.logEntries.popleft()  #  .dequeue()
-            safeguard.append(point)
-#             print("point as dico:", point, "Q len=", len(self.logEntries))
-            data.append(self.mapping(point))
-            print("Data point:", self.mapping(point), "Q len=", len(self.logEntries))
-
-        # call InfluxDB API
-        status_code = self.dbLogs.write_api(bucket=bucket, records=data)
-        print("API response code:", status_code)
-        if status_code >= 300:
-            print(f"Error calling {self.dbLogs.url}/write?db={bucket or self.dbLogs.bucket}")
-            for point in safeguard:
-                self.logEntries.append(point)
+        SLICE_SIZE = const(20)
+        for slice in range(len(self.logEntries) // SLICE_SIZE):
+            status_code = self.push_slice(bucket or self.dbLogs.bucket, SLICE_SIZE)
+            if status_code >= 300:
+                return status_code
+        # push the remaining points below 20
+        status_code = self.push_slice(bucket or self.dbLogs.bucket)
         return status_code
             
 

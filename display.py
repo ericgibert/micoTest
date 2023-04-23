@@ -6,7 +6,8 @@
 
 """
 from micropython import const
-from machine import Pin, I2C
+from utime import time
+from machine import Pin, I2C, Timer
 from ssd1306 import SSD1306_I2C
 
 WIDTH=const(128)
@@ -18,6 +19,18 @@ class Display(SSD1306_I2C):
         i2c = I2C(port, scl=Pin(scl), sda=Pin(sda), freq=freq)
         self.fontSize = FONTSIZE  # default font size
         super().__init__(width, height, i2c)
+        self.displayoff_timer = Timer(mode=Timer.PERIODIC, period= 15 * 1000, callback=self.displayOff)
+        self.displayOn()
+
+    def displayOn(self):
+        """Switch on the display and ensure 15 seconds ON"""
+        self.poweron()
+        self.offAt = time() + 15
+
+    def displayOff(self, timer):
+        if self.offAt and time() > self.offAt:
+            self.poweroff()
+            self.offAt = None
 
     def multiLines(self, lines, topMargin=0, leftMargin=0):
         """
@@ -27,7 +40,8 @@ class Display(SSD1306_I2C):
         :param leftMargin: left margin in pixel
         :return:
         """
-        self.fill(0)  # erase current screnn to black
+        self.displayOn()
+        self.fill(0)  # erase current screen to black
         x, y = leftMargin, topMargin
         for line in lines.split('\n'):
             self.text(line, x, y)
@@ -71,14 +85,15 @@ class Display(SSD1306_I2C):
         t = "\n".join([l for i in range(7)])
         self.multiLines(t)
 
-# if __name__ == "__main__":
-#     from time import sleep, localtime
-#     dis = Display(0, 17, 16)
-#     dis.screen("line 1 qui est tres longue\net ligne 2\nplus courte",
-#                title="Title", footer="Footer",
-#                button1="1", button2="2",button3="3", button4="4")
-#     while True:
-#         now = localtime()
-#         dis.multiLines(f"""{now[0]}-{now[1]:02}-{now[2]:02}
-# {now[3]}:{now[4]:02}:{now[5]:02}""")
-#     sleep(1)
+if __name__ == "__main__":
+    from time import sleep, localtime
+    dis = Display(0, 17, 16)
+    dis.screen("line 1 qui est tres longue\net ligne 2\nplus courte",
+               title="Title", footer="Footer",
+               button1="1", button2="2",button3="3", button4="4")
+    while True:
+        now = localtime()
+        dis.multiLines(f"""{now[0]}-{now[1]:02}-{now[2]:02}
+{now[3]}:{now[4]:02}:{now[5]:02}""")
+    sleep(5)
+    dis.poweroff()
