@@ -8,7 +8,8 @@ Application to monitor the moisture level in the soil of 3 plants.
 from micropython import const
 from machine import Pin, Timer
 from time import sleep, localtime
-import _thread
+# import _thread
+import gc
 
 from ntp import setClock
 from uwifi import uWifi
@@ -79,10 +80,14 @@ def core1_sendData(timer=None):
         log.push()
         disconnectWifi()
         print("Data sent")
+        gc.collect()
 
+def goto98(timer):
+    global state
+    state.changeTo(98)
         
 # second_thread = _thread.start_new_thread(core1_sendData, ())
-second_thread = Timer(mode=Timer.PERIODIC, period= 10 * 60 * 1000, callback=core1_sendData)
+# second_thread = Timer(mode=Timer.PERIODIC, period= (10 * 60 + 30) * 1000, callback=goto98)  #core1_sendData)
 
 def allReleased():
     """
@@ -91,35 +96,39 @@ def allReleased():
     while sum([b.value() for b in buttons]):
         sleep(0.05)
 
+buttonPressed = None
+def getButtons():
+    """
+    Check all 4 buttons and set the global variable if a button is pressed
+    """
+    global lastValues, buttonPressed
+    for i, button in enumerate(buttons):
+        btn = button.value()
+        if btn != lastValues[i]:
+            lastValues[i] = btn
+            if btn:
+                buttonPressed = i + 1  #  button 1 to 4
+                print("Pressed on", buttonPressed)
+            else:
+                print("Button", buttonPressed, "released")
+                buttonPressed = None
 
 state = State(99)  # 99 to display HOME screen as default screen
 refresh = 0
 while True:
     sleep(0.1)
-    for i, button in enumerate(buttons):
-        if button.value() != lastValues[i]:  #  look for button havong changed i.e. pressed vs released
-            lastValues[i] = button.value()
-            print(f"B{i} = {lastValues[i]}")
-
+    getButtons()
     # Automation based on states
     if state.currentState == 0:
         # default waiting state: act on a pressed button to change state
-        if lastValues[0]:   # Btn1 is pressed
-            state.changeTo(1)
-        elif lastValues[1]: # Btn2 is pressed
-            state.changeTo(2)
-        elif lastValues[2]: # Btn3 is pressed
-            state.changeTo(3)
-        elif lastValues[3]: # Btn4 is pressed
-            state.changeTo(4)
+        if buttonPressed:
+            state.changeTo(buttonPressed)
         else:
             if refresh >= 5:
                 state.changeTo(99)  # once in a while, refresh the screen for time display
                 refresh = 0
             else:
                 refresh += 1
-        # else ensure that all buttons are released
-        allReleased()
 
     # Action for button 1: look for a WIFI connection
     elif state.currentState == 1:
@@ -127,7 +136,7 @@ while True:
             # wlan = uWifi(dis)
             connectWifi()
             state.firstTime = False
-        if sum(lastValues) > 0:
+        elif buttonPressed:
             # a button is pressed
             state.changeTo(98) # send data if any to InfluxDb
 
@@ -143,9 +152,9 @@ while True:
                        title="Moisture",
                        button3="Read", button4="HOME")
             state.firstTime = False
-        if lastValues[3]:   # button4: let's go back to main screen
+        elif buttonPressed == 4:  # button4: let's go back to main screen
             state.changeToDefault()
-        elif lastValues[2]: # press on BTN3 -->  read again
+        elif buttonPressed == 3: # press on BTN3 -->  read again
             state.firstTime = True
             allReleased()
 
@@ -155,7 +164,7 @@ while True:
             dis.screen("Press STOP", button3="STOP")
             buzzer.on()
             state.firstTime = False
-        if lastValues[2]:  # button3: let's go back to main screen
+        elif buttonPressed == 3:  # button3: let's go back to main screen
             buzzer.off()
             state.changeTo(98) # send data if any to InfluxDb
 
@@ -175,9 +184,9 @@ Humidity: {humidity}%""", button3="Read", button4="Home")
             log.add("DATA", airSensor.DHTT.id, "temperature", temperature)
             log.add("DATA", airSensor.DHTH.id, "humidity", humidity)
             state.firstTime = False
-        if lastValues[3]:    # button4: let's go back to main screen
+        elif buttonPressed == 4:   # button4: let's go back to main screen
             state.changeToDefault()
-        elif lastValues[2]: # press on BTN3 -->  read again
+        elif buttonPressed == 3: # press on BTN3 -->  read again
             state.firstTime = True
             allReleased()
 
@@ -196,6 +205,7 @@ Humidity: {humidity}%""", button3="Read", button4="Home")
                 dis.screen(f"""No internet\n{len(log.logEntries)} pts in Q""")
                 sleep(2)
             disconnectWifi()
+            gc.collect()
         state.changeToDefault()
 
     # default action

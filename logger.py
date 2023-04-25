@@ -106,9 +106,9 @@ class Logger:
         # systemId: identifies the system either by a given name or by its mac address
         #           this will be a measurement/database for InfluxDb
         """
-        self.logEntries = deque((), 1000)  #  FIFO queue accepting 1000 pending readings
+        self.logEntries = deque((), 500)  #  FIFO queue accepting 1000 pending readings
         self.point["systemId"] = systemId
-        self.dbLogs = uInfluxDBClient(url=url, host=host, port=port, org=org)
+        self.InfluxClient = uInfluxDBClient(url=url, host=host, port=port, org=org)
         self.tz = tz
 
     def mapping(self, e):
@@ -156,10 +156,10 @@ calcValue={e["calcValue"]} \
             data.append(self.mapping(point))
             print(f"Data point {len(self.logEntries)}: {self.mapping(point)}")
         # call InfluxDB API
-        status_code = self.dbLogs.write_api(bucket=bucket, records=data)
+        status_code = self.InfluxClient.write_api(bucket=bucket, records=data)
         print("API response code:", status_code)
         if status_code >= 300:
-            print(f"Error calling {self.dbLogs.url}/write?db={bucket}")
+            print(f"Error calling {self.InfluxClient.url}/write?db={bucket}")
             for point in safeguard:
                 self.logEntries.append(point)
         return status_code
@@ -177,11 +177,11 @@ calcValue={e["calcValue"]} \
         print(len(self.logEntries), "points in Q to send to InfluxDb...")
         SLICE_SIZE = const(20)
         for slice in range(len(self.logEntries) // SLICE_SIZE):
-            status_code = self.push_slice(bucket or self.dbLogs.bucket, SLICE_SIZE)
+            status_code = self.push_slice(bucket or self.InfluxClient.bucket, SLICE_SIZE)
             if status_code >= 300:
                 return status_code
         # push the remaining points below 20
-        status_code = self.push_slice(bucket or self.dbLogs.bucket)
+        status_code = self.push_slice(bucket or self.InfluxClient.bucket)
         return status_code
 
 

@@ -19,7 +19,7 @@ class Display(SSD1306_I2C):
         i2c = I2C(port, scl=Pin(scl), sda=Pin(sda), freq=freq)
         self.fontSize = FONTSIZE  # default font size
         super().__init__(width, height, i2c)
-        self.displayoff_timer = Timer(mode=Timer.PERIODIC, period= 15 * 1000, callback=self.displayOff)
+        # self.displayoff_timer = Timer(mode=Timer.PERIODIC, period= 15 * 1000, callback=self.displayOff)
         self.displayOn()
 
     def displayOn(self):
