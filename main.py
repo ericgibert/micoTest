@@ -32,7 +32,7 @@ airSensor = DHT("DHT11", 11, 15)
 # buzzer
 buzzer = Pin(12, Pin.OUT)
 
-DAYS=const( ('MON', "TUE", "WED", "THU", "FRI", 'SAT', "SUN") )
+DAYS = const(('MON', "TUE", "WED", "THU", "FRI", 'SAT', "SUN"))
 wlan = None
 
 
@@ -61,16 +61,18 @@ def disconnectWifi():
     finally:
         onboard_led.off()
 
+
 connectWifi()
 try:
     setClock(tz=+8)  # need to better manage timezone, for now, clock is TZ ignorant
 except:
     pass
 print("my MAC address:", wlan.mac)
-log = Logger(wlan.mac, tz=+8)  #  MAC address used a systemId i.e. InfluxDb database
+log = Logger(wlan.mac, tz=+8)  # MAC address used a systemId i.e. InfluxDb database
 now = localtime()
 print("Local time:", now)
 disconnectWifi()
+
 
 # start a second thread to send data thru Wifi automatically
 def core1_sendData(timer=None):
@@ -82,10 +84,12 @@ def core1_sendData(timer=None):
         print("Data sent")
         gc.collect()
 
+
 def goto98(timer):
     global state
     state.changeTo(98)
-        
+
+
 # second_thread = _thread.start_new_thread(core1_sendData, ())
 # second_thread = Timer(mode=Timer.PERIODIC, period= (10 * 60 + 30) * 1000, callback=goto98)  #core1_sendData)
 
@@ -96,7 +100,10 @@ def allReleased():
     while sum([b.value() for b in buttons]):
         sleep(0.05)
 
+
 buttonPressed = None
+
+
 def getButtons():
     """
     Check all 4 buttons and set the global variable if a button is pressed
@@ -107,11 +114,12 @@ def getButtons():
         if btn != lastValues[i]:
             lastValues[i] = btn
             if btn:
-                buttonPressed = i + 1  #  button 1 to 4
+                buttonPressed = i + 1  # button 1 to 4
                 print("Pressed on", buttonPressed)
             else:
                 print("Button", buttonPressed, "released")
                 buttonPressed = None
+
 
 state = State(99)  # 99 to display HOME screen as default screen
 refresh = 0
@@ -138,7 +146,7 @@ while True:
             state.firstTime = False
         elif buttonPressed:
             # a button is pressed
-            state.changeTo(98) # send data if any to InfluxDb
+            state.changeTo(98)  # send data if any to InfluxDb
 
     # Action for button 2: display the readings of all ACDs for moisture
     elif state.currentState == 2:
@@ -154,7 +162,7 @@ while True:
             state.firstTime = False
         elif buttonPressed == 4:  # button4: let's go back to main screen
             state.changeToDefault()
-        elif buttonPressed == 3: # press on BTN3 -->  read again
+        elif buttonPressed == 3:  # press on BTN3 -->  read again
             state.firstTime = True
             allReleased()
 
@@ -166,7 +174,7 @@ while True:
             state.firstTime = False
         elif buttonPressed == 3:  # button3: let's go back to main screen
             buzzer.off()
-            state.changeTo(98) # send data if any to InfluxDb
+            state.changeTo(98)  # send data if any to InfluxDb
 
     # Action for button 4: read data from DHT11
     elif state.currentState == 4:
@@ -184,9 +192,9 @@ Humidity: {humidity}%""", button3="Read", button4="Home")
             log.add("DATA", airSensor.DHTT.id, "temperature", temperature)
             log.add("DATA", airSensor.DHTH.id, "humidity", humidity)
             state.firstTime = False
-        elif buttonPressed == 4:   # button4: let's go back to main screen
+        elif buttonPressed == 4:  # button4: let's go back to main screen
             state.changeToDefault()
-        elif buttonPressed == 3: # press on BTN3 -->  read again
+        elif buttonPressed == 3:  # press on BTN3 -->  read again
             state.firstTime = True
             allReleased()
 
@@ -209,14 +217,13 @@ Humidity: {humidity}%""", button3="Read", button4="Home")
         state.changeToDefault()
 
     # default action
-    elif state.currentState == 99:   # display the HOME screen and go to waiting a press (state = 0)
+    elif state.currentState == 99:  # display the HOME screen and go to waiting a press (state = 0)
         now = localtime()
         dis.screen(f""" {now[0]}-{now[1]:02}-{now[2]:02} {DAYS[now[6]]}
  {now[3]}:{now[4]:02}:{now[5]:02}
  Connected to
  {wlan.ssid or "None"}""", footer=f"{len(log.logEntries)}",
                    button1="Wifi", button2="ACD", button3="Buzz", button4="DHT")
-#         if wlan: log.push()
+        #         if wlan: log.push()
         state.changeTo(0)
         allReleased()
-
